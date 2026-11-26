@@ -1,4 +1,4 @@
-# Trick-taking card game project
+# Farmer's Bridge card game
 
 This project separates the **game engine**, **manual interface**, **Pygame interface**, and **CSV persistence**.
 
