@@ -4,7 +4,15 @@ version = "0.2.0"
 description = "A multi-interface trick-taking card game"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pygame>=2.6.1",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.6",
+    "streamlit>=1.67.0",
+    "tox>=4.67.16",
+    "uv>=0.13.10",
+]
 
 [tool.uv]
 package = false
