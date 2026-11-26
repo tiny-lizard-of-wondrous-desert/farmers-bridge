@@ -1,84 +1,80 @@
-from cardgame import Game, Player, CSVStore
+"""Interactive entry point for all three gameplay modes."""
+from __future__ import annotations
+import subprocess
+import sys
+from cardgame import CSVStore, Game, Player
 from cardgame.interfaces.manual import run_manual_game
-import math
 
 
-def choose_players(store):
-    """
-    Function to choose players for a game.
-    It allows the user to select from previously saved players or create new ones.
-    The function ensures that at least two players are selected before proceeding.
-
-    Inputs:
-    - store [dict*****: CSVStore class instance]: An instance of CSVStore to load and save player data.
-
-    Outputs:
-    - selected [list:Player class instances]: A list of Player instances representing the selected players for the game.
-    """
-    records = store.load_players()
-    selected = []
-    print("\nPlayer directory:")
-    if records:
-        for i, row in enumerate(records, 1):
-            print(f"  {i}. {row['name']}")
-    else:
-        print("  No saved players yet.")
-
+def choose_players(store: CSVStore) -> list[Player]:
+    """Select saved players or add new names for the next game."""
+    records, selected = store.load_players(), []
     while True:
-        raw = input("Choose player number from previous players above;"
-                    "NEW for new player;"
-                    "or DONE if you are finished selecting players: ").strip()
-        if raw.lower() in ("done", "d"):
-            if len(selected) >= 2:
-                return selected
-            print("Choose at least two players.")
-        elif raw.lower() in ("new", "n"):
-            name = input("New player's name: ").strip()
-            try:
-                row = store.add_player(name)
-            except ValueError as exc:
-                print(exc)
-                continue
+        print("\nSaved players:")
+        for number, row in enumerate(records, 1):
+            print(f"  {number}. {row['name']}")
+        raw = input("Choose number, NEW, or DONE: ").strip().casefold()
+        if raw in {"done", "d"} and len(selected) >= 2:
+            return selected
+        if raw in {"new", "n"}:
+            row = store.add_player(input("New player's name: "))
             if any(p.player_id == row["player_id"] for p in selected):
-                print("That player is already selected.")
-                continue
-            selected.append(Player(row["name"], row["player_id"]))
-            print(f"Added {row['name']} to this game.")
+                print("Already selected.")
+            else:
+                selected.append(Player(row["name"], row["player_id"]))
         elif raw.isdigit() and 1 <= int(raw) <= len(records):
             row = records[int(raw) - 1]
             if any(p.player_id == row["player_id"] for p in selected):
-                print("That player is already selected.")
-                continue
-            print(f"Player {row['name']} selected.")
-            selected.append(Player(row["name"], row["player_id"]))
+                print("Already selected.")
+            else:
+                selected.append(Player(row["name"], row["player_id"]))
         else:
-            print("Enter a listed number, N, or DONE.")
+            print("Select at least two distinct players; enter a valid number, NEW or DONE.")
 
 
-def main():
+def main() -> None:
+    """Select the mode, run a game, and persist completed local games."""
+    print("\nGameplay mode: 1) In person  2) Pygame pass-and-play  3) Online web")
+    mode = input("Choose 1, 2 or 3 [1]: ").strip() or "1"
+    if mode == "3":
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "streamlit", "run", "streamlit_app.py"],
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "Install online dependencies with `uv pip install -r requirements-web.txt`."
+            ) from exc
+        return
+    if mode not in {"1", "2"}:
+        raise ValueError("Choose gameplay mode 1, 2 or 3.")
+
     store = CSVStore()
     players = choose_players(store)
-
-    max_round = math.floor(51/len(players))
-    print("Minimum hand size possible is 1.")
-    print(f"Maximum hand size possible is {max_round}.")
-    start_round = int(input("Starting hand size [default: 1]: ") or "1")
-    end_round = int(input(f"Maximum hand size [default: 7]: ") or "7")
-    double_max = (input("Play the maximum twice? (yes/no) [default: yes]: ").strip().lower() or "y") in {"y", "yes"}
-    mode = input("Mode: M=manual scores, P=Pygame card play [default: M]: ").strip().lower() or "m"
-    dealer = int(input(f"Dealer position (1-{len(players)}) [default: 1]: ") or "1") - 1
-
+    max_round = 51 // len(players)
+    start_round = int(input("Starting hand size [1]: ") or "1")
+    end_round = int(input(f"Maximum hand size [{max_round}]: ") or str(max_round))
+    double_max = (input("Play maximum twice? [y/n]: ").strip().casefold() or "y") not in {"n", "no", "f", "false"}
+    dealer = int(input(f"Initial dealer position (1-{len(players)}) [1]: ") or "1") - 1
     game = Game.create(players, start_round, end_round, double_max, dealer)
 
-    if mode == "p":
-        from cardgame.interfaces.pygame_ui import PygameTable
-        PygameTable(game).run()
+    if mode == "2":
+        try:
+            from cardgame.interfaces.pygame_ui import PygameTable
+        except ImportError as exc:
+            print(exc)
+            return
+        completed = PygameTable(game).run()
+        if not completed:
+            print("Game closed before completion; no completed-game record was written.")
+            return
     else:
         run_manual_game(game)
 
     game_id, game_number = store.record_game(game)
     winners, high_score = game.winners()
-    print(f"\nSaved game #{game_number} for {game_id}.")
+    print(f"\nSaved game #{game_number} ({game_id}).")
     print(f"Winner(s): {', '.join(winners)} with {high_score} points.")
 
 

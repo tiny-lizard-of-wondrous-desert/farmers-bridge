@@ -1,104 +1,53 @@
+"""In-person interface: players handle cards and report bids/trick totals."""
 from __future__ import annotations
+from ..workflows import Prompts, enter_round_totals
 
 
-def ask_int(prompt, low, high):
-    while True:
-        raw = input(prompt).strip()
-        try:
-            value = int(raw)
-        except ValueError:
-            print("Enter a whole number.")
-            continue
-        if low <= value <= high:
-            return value
-        print(f"Enter a number from {low} to {high}.")
+class ConsolePrompts:
+    """Terminal implementation of the shared workflow prompt protocol."""
 
-
-def collect_bids(game):
-    round_no = game.current_round
-    bids = {}
-    total = 0
-    for index in game.order_left_of_dealer():
-        player = game.players[index]
-        is_dealer = index == game.dealer_index
+    def number(self, message: str, maximum: int) -> int:
         while True:
-            if is_dealer:
-                forbidden = round_no - total
-                if 0 <= forbidden <= round_no:
-                    print(f"Dealer cannot bid {forbidden}.")
-            bid = ask_int(f"Bid for {player.name}: ", 0, round_no)
-            if not (is_dealer and total + bid == round_no):
-                break
-            print("That would make the total bids equal the number of tricks.")
-        bids[player.name] = bid
-        total += bid
-    print(f"Total bids: {total}; tricks available: {round_no}.")
-    return bids
+            raw = input(f"{message}: ").strip()
+            try:
+                value = int(raw)
+            except ValueError:
+                print("Enter a whole number.")
+                continue
+            if 0 <= value <= maximum:
+                return value
+            print(f"Enter a number from 0 to {maximum}.")
+
+    def yes_no(self, message: str) -> bool:
+        while True:
+            answer = input(f"{message} [y/n]: ").strip().casefold()
+            if answer in {"y", "yes"}:
+                return True
+            if answer in {"n", "no"}:
+                return False
+            print("Please enter y or n.")
+
+    def message(self, message: str) -> None:
+        print(message)
 
 
-def collect_tricks(game):
-    round_no = game.current_round
-    while True:
-        tricks = {}
-        for index in game.order_left_of_dealer():
-            player = game.players[index]
-            tricks[player.name] = ask_int(
-                f"Tricks won by {player.name}: ", 0, round_no
-            )
-        total = sum(tricks.values())
-        if total == round_no:
-            return tricks
-        print(f"Those entries total {total}; they must total {round_no}. Please re-enter tricks.")
-
-
-def correct_bids(game, bids):
-    if input("Correct bids? (y/n): ").strip().lower() not in {"y", "yes"}:
-        return bids
-
-    while True:
-        corrected = {}
-        for index in game.order_left_of_dealer():
-            player = game.players[index]
-            corrected[player.name] = ask_int(
-                f"Correct bid for {player.name}: ", 0, game.current_round
-            )
-        if sum(corrected.values()) != game.current_round:
-            return corrected
-        print("Correction rejected: total bids cannot equal the number of tricks.")
-        if input("Try correcting bids again? (y/n): ").strip().lower() not in {"y", "yes"}:
-            return bids
-
-
-def correct_tricks(game, tricks):
-    if input("Correct trick counts? (y/n): ").strip().lower() not in {"y", "yes"}:
-        return tricks
-
-    while True:
-        corrected = {}
-        for index in game.order_left_of_dealer():
-            player = game.players[index]
-            corrected[player.name] = ask_int(
-                f"Correct tricks for {player.name}: ", 0, game.current_round
-            )
-        if sum(corrected.values()) == game.current_round:
-            return corrected
-        print(f"Correction rejected: trick counts must total {game.current_round}.")
-        if input("Try correcting tricks again? (y/n): ").strip().lower() not in {"y", "yes"}:
-            return tricks
-
-
-def play_manual_round(game):
+def play_manual_round(game, ui=None):
+    """Play a round with physical cards and manually entered results."""
+    if game.is_complete:
+        return None
+    ui = ui or ConsolePrompts()
     print(f"\nRound {len(game.results) + 1}: {game.current_round} card(s) per player")
-    bids = collect_bids(game)
-    bids = correct_bids(game, bids)
-    tricks = collect_tricks(game)
-    tricks = correct_tricks(game, tricks)
+    bids, tricks = enter_round_totals(game, ui)
     return game.accept_round(bids, tricks)
 
 
-def run_manual_game(game):
-    while game.current_round is not None:
-        result = play_manual_round(game)
+def run_manual_game(game, ui=None):
+    """Run all rounds; a completed game is a normal return, not an exception."""
+    ui = ui or ConsolePrompts()
+    while not game.is_complete:
+        result = play_manual_round(game, ui)
+        if result is None:
+            break
         print("\nRound points:")
         for name, points in result.points.items():
             print(f"  {name}: {points:+}")

@@ -1,0 +1,32 @@
+from cardgame import CSVStore, Game, Player
+
+def test_add_player_deduplicates_names(tmp_path):
+    store = CSVStore(tmp_path)
+    alice = store.add_player("Alice")
+    assert store.add_player("alice")["player_id"] == alice["player_id"]
+
+def test_record_game_includes_rounds_and_tied_ranks(tmp_path, players):
+    store = CSVStore(tmp_path)
+    game = Game.create(players, 1, 1, False)
+    game.players[0].score = game.players[1].score = 20
+    game.players[2].score = 5
+    game.players[0].bids = [0]; game.players[1].bids = [0]; game.players[2].bids = [0]
+    game.players[0].tricks = [1]; game.players[1].tricks = [0]; game.players[2].tricks = [0]
+    # Add a completed result to represent the finished one-round game.
+    from cardgame.engine import RoundResult
+    game.results.append(RoundResult(1, {p.name: 0 for p in players},
+                                    {"Alice": 1, "Bob": 0, "Casey": 0}, {}, {}))
+    game.round_index = 1
+    store.record_game(game, "2026-11-26")
+    rows = store.load_history()
+    assert {r["players_rank"] for r in rows if r["player_name"] in {"Alice", "Bob"}} == {"1"}
+    assert next(r for r in rows if r["player_name"] == "Casey")["players_rank"] == "3"
+    assert all(r["start_round"] == "1" and r["end_round"] == "1" for r in rows)
+
+def test_migrate_old_history_header(tmp_path):
+    path = tmp_path / "game_history.csv"
+    path.write_text("game_id,date,game_number,rounds_played\ng1,2026-01-01,1,2\n", encoding="utf-8")
+    store = CSVStore(tmp_path)
+    row = store.load_history()[0]
+    assert row["game_id"] == "g1"
+    assert "players_rank" in row
