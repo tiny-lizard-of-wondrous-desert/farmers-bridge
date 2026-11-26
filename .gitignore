@@ -1,0 +1,6 @@
+# Notebook caches
+.ipynb_checkpoints/
+
+# .py file caches
+__pycache__/
+*.pyc
