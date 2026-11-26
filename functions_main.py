@@ -52,11 +52,16 @@ class player(): #creates a new player
             new_score = old_score - abs(last_bid - last_trick)
         
         self.score = new_score #saving their new score
-        
-        
-        
+
+
 class game(): #creates a new game
-    def __init__(self,  players = [], start_round = 1, end_round = 7, double_max = True, dealer = -1): #sets the players and rounds
+    def __init__(self, players=None,
+                start_round=1, end_round=7,
+                double_max=True, dealer=-1):
+
+        if players is None:
+            players = []
+
         self.start_round = start_round
         self.end_round = end_round
         self.rounds = end_round - start_round
@@ -184,8 +189,8 @@ class game(): #creates a new game
         trick_lengths = []
         
         for player in self.players:
-            bid_lengths.append(len(player.get_bids))
-            trick_lengths.append(len(player.get_tricks))
+            bid_lengths.append(len(player.get_bids()))
+            trick_lengths.append(len(player.get_tricks()))
         
         while bid_lengths != trick_lengths:
             min_bid_len = min(bid_lengths)
@@ -316,7 +321,6 @@ class game(): #creates a new game
                 if other_player != top_player:
                     if other_score == top_score:
                         top_players.append(other_player)
-
             
             topplayers = ''
             if len(top_players) != 1:
@@ -338,34 +342,23 @@ class game(): #creates a new game
             
     def fix_scores(self):
         
-        fixing = input("Would you like to change the scores? (Please input 'Yes' or 'No'):")
-        
-        if fixing in ('No', 'NO', 'no'):
+        fix_input = input("Would you like to change the scores? (Please input 'Yes' or 'No'):")
+        fixing = fix_input.lower().strip()
+
+        if fixing in ('No', 'n', 0):
             return self
-        if fixing in ('Yes', 'YES', 'yes', 'YEs', 'YeS', 'yES'):
+        if fixing in ('Yes', 'y', 1):
             
             self.enter_bids()
-            
             self.enter_tricks()
-            
             self.fix_scores()
             
             return self
-            
+
         else:
-            print("I'm not sure what you want me to do, please input 'No' or 'Yes'.")
+            print("Please input 'No' (to skip correcting the inputs) or 'Yes' (to change the bids requested).")
             self.fix_scores()
             return self
-        
-        
-        
-        
-        
-# df = pd.DataFrame(columns=['Player1', 'Player2'])
-
-# df.to_csv(f'./Game_Logs/{datetime.datetime.now()}.csv')
-# # pd.read_csv('2022-12-19 14:42:05.902090.csv')
-
 
 
 def create_game(player_names, start_round = 1, end_round = 7, double_max = True, dealer = 0):
@@ -374,6 +367,3 @@ def create_game(player_names, start_round = 1, end_round = 7, double_max = True,
         playeri = player(player_names[i], i)
         players.append(playeri)
     return game(players = players, start_round = start_round, end_round = end_round, double_max = double_max, dealer = dealer)
-
-
-
