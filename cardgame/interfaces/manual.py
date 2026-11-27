@@ -1,6 +1,7 @@
 """In-person interface: players handle cards and report bids/trick totals."""
 from __future__ import annotations
-from ..workflows import Prompts, enter_round_totals
+
+from ..workflows import enter_round_totals
 
 
 class ConsolePrompts:

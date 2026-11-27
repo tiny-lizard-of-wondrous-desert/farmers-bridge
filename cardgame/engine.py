@@ -1,10 +1,12 @@
 """Interface-independent game state, validation, dealing and scoring."""
 from __future__ import annotations
+
 import random
 from dataclasses import dataclass, field
-from uuid import uuid4
 from typing import Any
-from .models import Card, Player, Suit, RANKS
+from uuid import uuid4
+
+from .models import RANKS, Card, Player, Suit
 
 
 @dataclass(slots=True)
@@ -32,7 +34,7 @@ class Game:
     @classmethod
     def create(cls, players: list[Player], start_round: int = 1,
                end_round: int = 7, double_max: bool = True,
-               dealer_index: int = 0) -> "Game":
+               dealer_index: int = 0) -> Game:
         """Create a game with its complete round schedule fixed up front."""
         if len(players) < 2:
             raise ValueError("A game requires at least two players.")
@@ -175,7 +177,7 @@ class Game:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Game":
+    def from_dict(cls, data: dict) -> Game:
         """Restore a game checkpoint without recalculating its round schedule."""
         players = [
             Player(p["name"], p.get("player_id", ""), list(p.get("bids", [])),

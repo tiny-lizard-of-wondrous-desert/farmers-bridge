@@ -1,10 +1,11 @@
 """Domain models and card rules for Farmer's Bridge."""
 from __future__ import annotations
+
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class Suit(str, Enum):
+class Suit(StrEnum):
     """The four standard playing-card suits."""
     CLUBS = "Clubs"
     DIAMONDS = "Diamonds"

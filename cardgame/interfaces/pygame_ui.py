@@ -1,10 +1,11 @@
 """Optional local pass-and-play Pygame interface."""
 from __future__ import annotations
+
 import random
 import re
 
-from ..models import Card, RANKS, Suit, legal_cards, trick_winner
-from ..workflows import review_tricks, collect_bids, review_bids
+from ..models import RANKS, Card, Suit, legal_cards, trick_winner
+from ..workflows import collect_bids, review_bids, review_tricks
 
 try:
     import pygame

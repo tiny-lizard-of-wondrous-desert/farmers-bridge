@@ -1,4 +1,5 @@
-from cardgame.workflows import collect_bids, review_bids, collect_tricks, review_tricks
+from cardgame.workflows import collect_bids, collect_tricks, review_bids, review_tricks
+
 
 class FakeUI:
     def __init__(self, numbers=(), answers=()):

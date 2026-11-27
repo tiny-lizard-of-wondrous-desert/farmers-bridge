@@ -1,8 +1,10 @@
 """Interactive entry point for all three gameplay modes."""
 from __future__ import annotations
+
 import subprocess
 import sys
 from pathlib import Path
+
 from cardgame import CSVStore, Game, Player
 from cardgame.interfaces.manual import run_manual_game
 

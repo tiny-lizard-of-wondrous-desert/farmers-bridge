@@ -1,5 +1,6 @@
 from cardgame import CSVStore, Game, Player
 
+
 def test_add_player_deduplicates_names(tmp_path):
     store = CSVStore(tmp_path)
     alice = store.add_player("Alice")
@@ -10,8 +11,15 @@ def test_record_game_includes_rounds_and_tied_ranks(tmp_path, players):
     game = Game.create(players, 1, 1, False)
     game.players[0].score = game.players[1].score = 20
     game.players[2].score = 5
-    game.players[0].bids = [0]; game.players[1].bids = [0]; game.players[2].bids = [0]
-    game.players[0].tricks = [1]; game.players[1].tricks = [0]; game.players[2].tricks = [0]
+
+    game.players[0].bids = [0]
+    game.players[1].bids = [0]
+    game.players[2].bids = [0]
+
+    game.players[0].tricks = [1]
+    game.players[1].tricks = [0]
+    game.players[2].tricks = [0]
+    
     # Add a completed result to represent the finished one-round game.
     from cardgame.engine import RoundResult
     game.results.append(RoundResult(1, {p.name: 0 for p in players},

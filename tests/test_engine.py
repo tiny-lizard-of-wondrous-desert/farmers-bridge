@@ -1,6 +1,9 @@
 import random
+
 import pytest
-from cardgame import Game, Player, Suit
+
+from cardgame import Game, Suit
+
 
 def test_round_sequence_and_dealer_order(players):
     game = Game.create(players, 1, 3, True)

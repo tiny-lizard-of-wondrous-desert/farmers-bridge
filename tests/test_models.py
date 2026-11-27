@@ -1,5 +1,7 @@
 import pytest
-from cardgame.models import Card, Suit, Player, legal_cards, trick_winner
+
+from cardgame.models import Card, Player, Suit, legal_cards, trick_winner
+
 
 def test_card_labels_and_suit_conversion():
     assert Card("Hearts", 14).label == "AH"

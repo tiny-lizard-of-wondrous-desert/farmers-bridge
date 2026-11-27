@@ -3,20 +3,21 @@
 SQLite is the low-dependency state store; an optional private-file backup supports cloud recovery.
 """
 from __future__ import annotations
+
 import hashlib
 import json
 import logging
 import random
 import secrets
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 from uuid import uuid4
 
-from .engine import Game, RoundResult
-from .models import Card, Player, RANKS, Suit, legal_cards, trick_winner
-from .storage import CSVStore
 from .backup import GitHubFileBackup
+from .engine import Game, RoundResult
+from .models import RANKS, Card, Player, Suit, legal_cards, trick_winner
+from .storage import CSVStore
 
 
 class OnlineRoomStore:

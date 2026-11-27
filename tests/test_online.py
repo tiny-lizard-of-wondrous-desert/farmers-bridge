@@ -1,4 +1,5 @@
 import pytest
+
 from cardgame.online import OnlineRoomStore
 
 

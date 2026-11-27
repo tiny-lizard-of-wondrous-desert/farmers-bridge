@@ -1,6 +1,7 @@
 """Cross-component integration and complete-game smoke tests."""
 from cardgame import CSVStore, Game, Player
 
+
 def test_full_manual_game_and_persistence(tmp_path):
     players = [Player("A", "a"), Player("B", "b"), Player("C", "c")]
     game = Game.create(players, 1, 2, False)

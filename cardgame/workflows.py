@@ -1,6 +1,8 @@
 """Shared bid/trick collection and correction workflows for every interface."""
 from __future__ import annotations
+
 from typing import Protocol
+
 from .engine import Game
 
 
