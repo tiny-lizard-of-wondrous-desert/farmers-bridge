@@ -55,7 +55,7 @@ def main() -> None:
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
-                "Install online dependencies with `uv pip install -r requirements-web.txt`."
+                "Install online dependencies with `uv sync --group online`."
             ) from exc
         return
     if mode not in {"1", "2"}:

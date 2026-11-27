@@ -8,9 +8,9 @@ Notable changes to gameplay, scoring, interfaces and developer tooling.
 - Shared `workflows.py` for bid/trick collection, review and correction across interfaces.
 - Separate `validate_bids()` and `validate_tricks()` engine validation methods.
 - Normal game-completion state via `is_complete` and `current_round is None`.
-- `Suit` enum, immutable slotted `Card` model and card-rule unit tests; no third-party card library was added because the available candidates are small/limited-maintenance projects.
+- `Suit` enum, immutable slotted `Card` model and card-rule unit tests; Pygame card artwork is sourced from `pygame-cards`, while the engine retains its independent lightweight card model.
 - Three-mode setup: in-person, local Pygame pass-and-play, and a Streamlit multi-browser online-play MVP with room PINs, private hand display, bidding, trick play, corrections, scoring and CSV export.
-- CSV fields for starting/ending hand size and competition-style player rank.
+- CSV fields for starting/ending hand size and dense player rank.
 - Automatic migration of older CSV headers while preserving existing rows.
 - pytest unit/integration tests, Ruff configuration, uv project metadata and tox environments.
 - Online-play scope and free-hosting architecture notes.
@@ -26,7 +26,7 @@ Notable changes to gameplay, scoring, interfaces and developer tooling.
 ### Fixed
 - Game completion no longer requires catching a `RuntimeError` from `deal_round()` or `accept_round()`.
 - Bids and trick totals can be checked independently immediately after their respective entry phases.
-- Tied winners receive rank 1, with competition ranking for subsequent players.
+- Tied players share a rank, and the next distinct score receives the next consecutive rank.
 - CSV schema updates no longer discard previously recorded game rows.
 
 ### Documentation
@@ -51,3 +51,8 @@ Notable changes to gameplay, scoring, interfaces and developer tooling.
 - Switched Pygame card artwork to the `pygame-cards` standard 52-card set.
 - Grouped optional dependencies into `dev`, `local` and `online`; added a pre-commit uv lock/export hook.
 - Anchored project data and test imports to the project path rather than the current working directory.
+
+- Updated the Streamlit landing flow so create/join is the first screen and disappears after joining a room.
+- Added an adjustable hand/game-mat split, full-panel views, a score dialog and a continuously visible game table with round direction, bids, tricks, leader and turn.
+- Added current-round direction and score-table context to the in-person and Pygame interfaces.
+- Consolidated pip requirements into one all-groups `requirements.txt`; uv dependency groups remain independently selectable and tox uses those groups.

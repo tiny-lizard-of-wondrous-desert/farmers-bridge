@@ -65,6 +65,14 @@ class Game:
         return self.current_round is None
 
     @property
+    def round_direction(self) -> str | None:
+        """Return UP or DOWN for the current part of the round schedule."""
+        if self.is_complete:
+            return None
+        up_rounds = self.end_round - self.start_round + 1
+        return "UP" if self.round_index < up_rounds else "DOWN"
+
+    @property
     def dealer(self) -> Player:
         return self.players[self.dealer_index]
 

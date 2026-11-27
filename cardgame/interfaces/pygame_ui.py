@@ -167,9 +167,19 @@ class PygameTable:
                         if rect.collidepoint(event.pos):
                             return card
             self.screen.fill(BG)
-            self.text(f"{player.name}: choose a card", 40, 25)
-            self.text(f"Trump: {trump_suit.value} | Led suit: {getattr(led_suit, 'value', 'Lead')}", 40, 75, self.small)
-            self.text(f"Cards in trick: {len(plays)} / {len(self.game.players)}", 40, 115, self.small)
+            self.text(
+                f"Round {len(self.game.results) + 1}: {self.game.current_round} cards — {self.game.round_direction}",
+                40, 15, self.small,
+            )
+            self.text(
+                "Game table: " + " | ".join(
+                    f"{p.name}: {p.score}" for p in self.game.players
+                ),
+                40, 45, self.small,
+            )
+            self.text(f"{player.name}: choose a card", 40, 80)
+            self.text(f"Trump: {trump_suit.value} | Led suit: {getattr(led_suit, 'value', 'Lead')}", 40, 125, self.small)
+            self.text(f"Cards in trick: {len(plays)} / {len(self.game.players)}", 40, 160, self.small)
             card_width = min(90, (WIDTH - 60 - 8 * (len(allowed) - 1)) // len(allowed))
             card_height = int(card_width * 1.55)
             gap = 8
@@ -206,8 +216,10 @@ class PygameTable:
         if active is None:
             hands, trump_suit, trump_card, _ = self._deal_round()
             self.wait_for_enter(
-                f"Round {len(self.game.results) + 1}: {round_no} cards each",
-                f"Trump card: {trump_card} — press ENTER",
+                f"Round {len(self.game.results) + 1}: {round_no} cards each — {self.game.round_direction}",
+                "Current game table: " + " | ".join(
+                    f"{player.name}: {player.score}" for player in self.game.players
+                ) + f" — Trump: {trump_card} — press ENTER",
             )
             # Shared bid workflow: same collection, validation and correction logic as in-person mode.
             bids = review_bids(self.game, collect_bids(self.game, ui), ui)

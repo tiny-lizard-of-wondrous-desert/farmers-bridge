@@ -70,3 +70,16 @@ def test_dealer_rotation_and_property(game):
     game.rotate_dealer()
     assert game.dealer.name == "Bob"
     assert game.order_left_of_dealer() == [2, 0, 1]
+
+
+def test_round_direction_switches_from_up_to_down(players):
+    game = Game.create(players, 1, 3, True)
+    assert game.round_direction == "UP"
+    for _ in range(3):
+        round_no = game.current_round
+        game.accept_round(
+            {"Alice": 0, "Bob": 0, "Casey": 0},
+            {"Alice": round_no, "Bob": 0, "Casey": 0},
+        )
+    assert game.current_round == 3
+    assert game.round_direction == "DOWN"

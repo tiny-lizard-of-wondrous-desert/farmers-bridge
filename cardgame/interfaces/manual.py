@@ -37,7 +37,14 @@ def play_manual_round(game, ui=None):
     if game.is_complete:
         return None
     ui = ui or ConsolePrompts()
-    print(f"\nRound {len(game.results) + 1}: {game.current_round} card(s) per player")
+    print(
+        f"\nRound {len(game.results) + 1}: {game.current_round} card(s) per player "
+        f"({game.round_direction})"
+    )
+    print("Current game table:")
+    print(f"  Dealer: {game.dealer.name}")
+    for player in sorted(game.players, key=lambda p: p.score, reverse=True):
+        print(f"  {player.name}: {player.score}")
     bids, tricks = enter_round_totals(game, ui)
     return game.accept_round(bids, tricks)
 
@@ -54,6 +61,11 @@ def run_manual_game(game, ui=None, on_round_complete=None):
         print("\nRound points:")
         for name, points in result.points.items():
             print(f"  {name}: {points:+}")
-        print("Current scores:")
+        print("Current game table:")
+        next_round = game.current_round
+        if next_round is None:
+            print("  Game complete")
+        else:
+            print(f"  Next round: {next_round} cards ({game.round_direction})")
         for player in sorted(game.players, key=lambda p: p.score, reverse=True):
             print(f"  {player.name}: {player.score}")

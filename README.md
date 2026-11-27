@@ -27,10 +27,11 @@ uv sync --group dev                         # tests, coverage, Ruff, tox and pre
 ```
 
 The base engine uses only the Python standard library. No optional group is installed by default.
-Optional dependencies are grouped in `pyproject.toml`: `local`, `online` and `dev`. `requirements.txt` is the generated Streamlit
-Community Cloud export for the `online` group; `requirements-local.txt` and
-`requirements-dev.txt` are generated exports for the other groups. The older
-`requirements-pygame.txt` and `requirements-web.txt` remain as compatibility aliases.
+Optional dependencies are grouped in `pyproject.toml`: `local`, `online` and `dev`.
+`requirements.txt` is the single generated export containing every group for tools
+that require a pip requirements file. For normal development, select only the
+needed groups with `uv sync --group ...`; do not install the combined export unless
+you want every optional dependency.
 
 Run the in-person game after the base environment is synced:
 
@@ -48,18 +49,20 @@ uv run --no-sync streamlit run streamlit_app.py
 ## Tests, lint and formatting
 
 ```bash
-uv run pytest
-uv run pytest --cov=cardgame --cov-report=term-missing
-uv run ruff check .
-uv run ruff format --check .
-uv run ruff format .
-uv run tox
-uv run pre-commit install
+uv run --group dev pytest
+uv run --group dev pytest --cov=cardgame --cov-report=term-missing
+uv run --group dev ruff check .
+uv run --group dev ruff format --check .
+uv run --group dev ruff format .
+uv run --group dev tox
+uv run --group dev pre-commit install
 ```
 
-`tox` runs tests across Python 3.11, 3.12 and 3.13 (those interpreters must be available or provisioned). Its `dev` and `lint` environments run Ruff. `uv.lock` pins all dependency groups. A pre-commit hook runs `uv lock` and exports all three
-requirement files before each commit, then stages the updated lock and exports. Install the hook
-once with `uv run pre-commit install`.
+`tox` delegates dependency selection to uv: `dev` runs tests and Ruff, `local`
+tests the Pygame dependency group, and `online` tests the Streamlit group.
+`uv.lock` pins all dependency groups. A pre-commit hook runs `uv lock` and exports
+all groups into the single `requirements.txt` before each commit, then stages the
+updated lock and export. Install the hook once with `uv run --group dev pre-commit install`.
 
 ## Gameplay modes
 

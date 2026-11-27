@@ -1,4 +1,4 @@
-"""Regenerate lockfile and pip requirement exports before each commit."""
+"""Regenerate the uv lockfile and one pip requirements export before each commit."""
 from __future__ import annotations
 
 import subprocess
@@ -13,19 +13,23 @@ def run(*args: str) -> None:
 
 
 def main() -> None:
-    uv = "uv"
-    run(uv, "lock")
-    exports = {
-        "online": "requirements.txt",
-        "local": "requirements-local.txt",
-        "dev": "requirements-dev.txt",
-    }
-    for group, output in exports.items():
-        run(
-            uv, "export", "--locked", "--no-hashes", "--no-emit-project",
-            "--only-group", group, "--output-file", output,
+    uv = shutil.which("uv")
+    if uv is None:
+        candidates = [
+            ROOT / ".venv" / "Scripts" / "uv.exe",
+            ROOT / ".venv" / "bin" / "uv",
+        ]
+        uv = next((str(path) for path in candidates if path.is_file()), None)
+    if uv is None:
+        raise FileNotFoundError(
+            "uv was not found on PATH or in the project .venv. Install uv and reopen the terminal."
         )
-    run("git", "add", "uv.lock", *exports.values())
+    run(uv, "lock")
+    run(
+        uv, "export", "--locked", "--all-groups", "--no-hashes",
+        "--no-emit-project", "--output-file", "requirements.txt",
+    )
+    run("git", "add", "uv.lock", "requirements.txt")
 
 
 if __name__ == "__main__":

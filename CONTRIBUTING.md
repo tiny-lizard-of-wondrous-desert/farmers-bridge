@@ -5,7 +5,7 @@ Thanks for helping improve Farmer's Bridge. Keep the rules engine independent fr
 ## Development setup
 
 ```bash
-uv sync --all-extras
+uv sync --group dev
 ```
 
 Use a feature branch and make focused changes. Do not commit real player data, PINs, secrets, local databases or virtual environments.
@@ -23,15 +23,15 @@ Use a feature branch and make focused changes. Do not commit real player data, P
 ## Before submitting
 
 ```bash
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
+uv run --group dev pytest
+uv run --group dev ruff check .
+uv run --group dev ruff format --check .
 ```
 
 For broad compatibility testing:
 
 ```bash
-uv run tox
+uv run --group dev tox
 ```
 
 Add tests for new rules, invalid input, normal completion, and relevant interface/storage integration. Update README and CHANGELOG for user-visible changes. Add/update docstrings for public functions and classes.
@@ -55,13 +55,12 @@ The project uses uv dependency groups:
 uv sync --group dev
 uv sync --group local
 uv sync --group online
-uv run pre-commit install
+uv run --group dev pre-commit install
 ```
 
-The pre-commit hook updates `uv.lock` and exports `requirements.txt` (online),
-`requirements-local.txt` (local) and `requirements-dev.txt` (dev) before every commit.
-Do not edit generated requirement exports by hand; edit the corresponding group in
-`pyproject.toml` instead.
+The pre-commit hook updates `uv.lock` and exports every uv dependency group into
+the single `requirements.txt` before each commit. Do not edit the generated export
+by hand; edit the corresponding group in `pyproject.toml` instead.
 
 ## Private player data
 
