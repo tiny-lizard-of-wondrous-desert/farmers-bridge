@@ -38,3 +38,14 @@ Notable changes to gameplay, scoring, interfaces and developer tooling.
 - Initial score calculations and round/dealer progression.
 - Added player directory and CSV game history.
 - Added manual score entry and local Pygame pass-and-play prototype.
+
+## Unreleased
+
+- Added automatic local game checkpoints, including card-by-card Pygame recovery.
+- Added optional private GitHub file backups for Streamlit SQLite and CSV persistence; no Supabase/Postgres dependency is required.
+- Added automatic three-second Streamlit game-mat refresh and player win/score statistics tied to stable player IDs.
+- Made online player PINs optional at room creation.
+- Changed rankings to dense ranking (ties do not leave rank gaps).
+- Switched Pygame card artwork to the `pygame-cards` standard 52-card set.
+- Grouped optional dependencies into `dev`, `local` and `online`; added a pre-commit uv lock/export hook.
+- Anchored project data and test imports to the project path rather than the current working directory.

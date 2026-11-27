@@ -55,3 +55,15 @@ def test_online_bid_review_rejects_dealer_forbidden_total(tmp_path):
     store.submit_bid(code, "Bea", 1)
     with pytest.raises(ValueError, match="[Dd]ealer's bid"):
         store.submit_bid(code, "Ada", 0)
+
+
+def test_optional_player_pins_and_stable_ids(tmp_path):
+    store = OnlineRoomStore(tmp_path / "optional-pins.sqlite3")
+    ids = ["saved-user-ada", "saved-user-bea"]
+    code, pins = store.create_room(
+        ["Ada", "Bea"], 1, 1, False, player_ids=ids, require_pins=False
+    )
+    assert pins == {"Ada": "", "Bea": ""}
+    assert store.authenticate(code, "Ada", "")
+    assert not store.authenticate(code, "Ada", "123456")
+    assert store.load(code)["players"][0]["player_id"] == ids[0]

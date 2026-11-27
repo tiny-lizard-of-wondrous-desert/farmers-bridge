@@ -12,7 +12,4 @@ data/*.sqlite3
 data/*.db
 .streamlit/secrets.toml
 .env
-# Player names, scores and live room state are local application data.
-# data/*.csv
-# data/*.sqlite3
-# data/*.db
+

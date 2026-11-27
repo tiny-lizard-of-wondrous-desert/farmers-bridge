@@ -41,13 +41,15 @@ def play_manual_round(game, ui=None):
     return game.accept_round(bids, tricks)
 
 
-def run_manual_game(game, ui=None):
+def run_manual_game(game, ui=None, on_round_complete=None):
     """Run all rounds; a completed game is a normal return, not an exception."""
     ui = ui or ConsolePrompts()
     while not game.is_complete:
         result = play_manual_round(game, ui)
         if result is None:
             break
+        if on_round_complete:
+            on_round_complete(game)
         print("\nRound points:")
         for name, points in result.points.items():
             print(f"  {name}: {points:+}")

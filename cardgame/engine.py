@@ -2,8 +2,9 @@
 from __future__ import annotations
 import random
 from dataclasses import dataclass, field
+from uuid import uuid4
 from typing import Any
-from .models import Card, Player, Suit, RANKS, legal_cards, trick_winner
+from .models import Card, Player, Suit, RANKS
 
 
 @dataclass(slots=True)
@@ -25,6 +26,8 @@ class Game:
     results: list[RoundResult] = field(default_factory=list)
     start_round: int = 1
     end_round: int = 7
+    active_round: dict | None = None
+    game_id: str = field(default_factory=lambda: uuid4().hex[:12])
 
     @classmethod
     def create(cls, players: list[Player], start_round: int = 1,
@@ -118,6 +121,7 @@ class Game:
         result = RoundResult(round_no, dict(bids), dict(tricks), points,
                              {p.name: p.score for p in self.players}, trump_suit)
         self.results.append(result)
+        self.active_round = None
         self.round_index += 1
         self.rotate_dealer()
         return result
@@ -142,7 +146,53 @@ class Game:
         return [p.name for p in self.players if p.score == high_score], high_score
 
     def rankings(self) -> dict[str, int]:
-        """Ranking: tied first places both rank 1; next is rank 2."""
-        ordered = sorted((p.score for p in self.players), reverse=True)
-        ranks = {score: ordered.index(score) + 1 for score in set(ordered)}
-        return {p.name: ranks[p.score] for p in self.players}
+        """Return dense rankings: ties share a rank and the next rank increments by one."""
+        ordered_scores = sorted({player.score for player in self.players}, reverse=True)
+        ranks = {score: index + 1 for index, score in enumerate(ordered_scores)}
+        return {player.name: ranks[player.score] for player in self.players}
+
+    def to_dict(self) -> dict:
+        """Serialize enough game state to resume a local game."""
+        return {
+            "players": [
+                {"name": p.name, "player_id": p.player_id, "bids": p.bids,
+                 "tricks": p.tricks, "score": p.score}
+                for p in self.players
+            ],
+            "round_sequence": self.round_sequence,
+            "dealer_index": self.dealer_index,
+            "round_index": self.round_index,
+            "start_round": self.start_round,
+            "end_round": self.end_round,
+            "active_round": self.active_round,
+            "game_id": self.game_id,
+            "results": [
+                {"round_number": r.round_number, "bids": r.bids, "tricks": r.tricks,
+                 "points": r.points, "scores": r.scores,
+                 "trump_suit": r.trump_suit.value if r.trump_suit else None}
+                for r in self.results
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Game":
+        """Restore a game checkpoint without recalculating its round schedule."""
+        players = [
+            Player(p["name"], p.get("player_id", ""), list(p.get("bids", [])),
+                   list(p.get("tricks", [])), int(p.get("score", 0)))
+            for p in data["players"]
+        ]
+        results = [
+            RoundResult(
+                int(r["round_number"]), dict(r["bids"]), dict(r["tricks"]),
+                dict(r["points"]), dict(r["scores"]),
+                Suit(r["trump_suit"]) if r.get("trump_suit") else None,
+            )
+            for r in data.get("results", [])
+        ]
+        return cls(
+            players, list(data["round_sequence"]), int(data["dealer_index"]),
+            int(data["round_index"]), results, int(data["start_round"]),
+            int(data["end_round"]), data.get("active_round"),
+            data.get("game_id") or uuid4().hex[:12],
+        )

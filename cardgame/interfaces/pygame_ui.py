@@ -1,15 +1,19 @@
 """Optional local pass-and-play Pygame interface."""
 from __future__ import annotations
-from ..models import legal_cards, trick_winner
-from ..workflows import enter_round_totals
+import random
+import re
+
+from ..models import Card, RANKS, Suit, legal_cards, trick_winner
+from ..workflows import review_tricks, collect_bids, review_bids
 
 try:
     import pygame
+    from pygame_cards.classics import CardSets
 except ImportError as exc:  # Import only when this optional interface is selected.
-    raise ImportError("Pygame mode requires `uv pip install -r requirements-pygame.txt`.") from exc
+    raise ImportError("Pygame mode requires `uv sync --group local`.") from exc
 
 WIDTH, HEIGHT = 1100, 760
-BG, WHITE, DARK, RED, BLACK = (24, 92, 67), (245, 245, 235), (25, 30, 32), (180, 55, 55), (20, 20, 20)
+BG, WHITE = (24, 92, 67), (245, 245, 235)
 
 
 class WindowClosed(Exception):
@@ -32,14 +36,62 @@ class PygamePrompts:
 
 
 class PygameTable:
-    def __init__(self, game):
+    def __init__(self, game, on_round_complete=None):
         pygame.init()
         self.game = game
+        self.on_round_complete = on_round_complete
+        self.library_cards = self._load_card_library()
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption("Farmer's Bridge")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("arial", 28)
         self.small = pygame.font.SysFont("arial", 20)
+
+    @staticmethod
+    def _load_card_library():
+        """Use pygame_cards' standard 52-card set for all card artwork."""
+        library = {}
+        rank_names = {
+            "jack": 11, "queen": 12, "king": 13, "ace": 14,
+            "j": 11, "q": 12, "k": 13, "a": 14,
+        }
+        for library_card in CardSets.n52.copy():
+            name = str(library_card.name)
+            lowered = name.casefold()
+            suit = next(
+                (candidate for candidate in Suit if candidate.value.casefold() in lowered),
+                None,
+            )
+            if suit is None:
+                raise RuntimeError(f"Cannot identify the suit in pygame_cards card {name!r}.")
+            number = getattr(library_card, "number", None)
+            if hasattr(number, "value"):
+                number = number.value
+            if not isinstance(number, int):
+                token = re.split(r"\s+of\s+|\s+", lowered)[0]
+                number = rank_names.get(token, int(token) if token.isdigit() else None)
+            if number not in RANKS:
+                token = re.split(r"\s+of\s+|\s+", lowered)[0]
+                number = rank_names.get(token)
+            if number not in RANKS:
+                raise RuntimeError(f"Cannot identify the rank in pygame_cards card {name!r}.")
+            library[(suit, number)] = library_card
+        if len(library) != 52:
+            raise RuntimeError(f"pygame_cards supplied {len(library)} unique cards; expected 52.")
+        return library
+
+    def _deal_round(self):
+        """Deal from the pygame_cards 52-card library, retaining engine rule objects."""
+        deck = list(self.library_cards)
+        random.shuffle(deck)
+        hands = {index: [] for index in range(len(self.game.players))}
+        for _ in range(self.game.current_round):
+            for player_index in self.game.order_left_of_dealer():
+                suit, rank = deck.pop()
+                hands[player_index].append(Card(suit, rank))
+        suit, rank = deck.pop()
+        trump_card = Card(suit, rank)
+        return hands, trump_card.suit, trump_card, deck
 
     def _events(self):
         for event in pygame.event.get():
@@ -106,10 +158,11 @@ class PygameTable:
             for event in self._events():
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     card_width = min(90, (WIDTH - 60 - 8 * (len(allowed) - 1)) // len(allowed))
+                    card_height = int(card_width * 1.55)
                     gap = 8
                     start_x = (WIDTH - (len(allowed) * card_width + (len(allowed) - 1) * gap)) // 2
                     for i, card in enumerate(allowed):
-                        rect = pygame.Rect(start_x + i * (card_width + gap), 550, card_width, 135)
+                        rect = pygame.Rect(start_x + i * (card_width + gap), 550, card_width, card_height)
                         if rect.collidepoint(event.pos):
                             return card
             self.screen.fill(BG)
@@ -117,46 +170,123 @@ class PygameTable:
             self.text(f"Trump: {trump_suit.value} | Led suit: {getattr(led_suit, 'value', 'Lead')}", 40, 75, self.small)
             self.text(f"Cards in trick: {len(plays)} / {len(self.game.players)}", 40, 115, self.small)
             card_width = min(90, (WIDTH - 60 - 8 * (len(allowed) - 1)) // len(allowed))
+            card_height = int(card_width * 1.55)
             gap = 8
             start_x = (WIDTH - (len(allowed) * card_width + (len(allowed) - 1) * gap)) // 2
             for i, card in enumerate(allowed):
-                rect = pygame.Rect(start_x + i * (card_width + gap), 550, card_width, 135)
-                pygame.draw.rect(self.screen, WHITE, rect, border_radius=9)
-                pygame.draw.rect(self.screen, DARK, rect, 2, border_radius=9)
-                color = RED if card.suit.value in ("Hearts", "Diamonds") else BLACK
-                self.text(card.label, rect.centerx, rect.centery, self.font, color, True)
+                x = start_x + i * (card_width + gap)
+                library_card = self.library_cards[(card.suit, card.rank)]
+                artwork = pygame.transform.smoothscale(
+                    library_card.graphics.surface, (card_width, card_height)
+                )
+                self.screen.blit(artwork, (x, 550))
             pygame.display.flip()
             self.clock.tick(30)
+
+    def _save_checkpoint(self):
+        if self.on_round_complete:
+            self.on_round_complete(self.game)
+
+    @staticmethod
+    def _card_data(card):
+        return [card.suit.value, card.rank]
+
+    @staticmethod
+    def _card_from_data(data):
+        return Card(Suit(data[0]), int(data[1]))
 
     def play_card_round(self):
         if self.game.is_complete:
             return None
         round_no = self.game.current_round
-        hands, trump_suit, trump_card, _ = self.game.deal_round()
-        self.wait_for_enter(f"Round {len(self.game.results) + 1}: {round_no} cards each",
-                            f"Trump card: {trump_card} — press ENTER")
+        active = self.game.active_round
         ui = PygamePrompts(self)
-        # Shared bid workflow: same collection, validation and correction logic as in-person mode.
-        from ..workflows import collect_bids, review_bids, collect_tricks, review_tricks
-        bids = review_bids(self.game, collect_bids(self.game, ui), ui)
-        tricks_won = {p.name: 0 for p in self.game.players}
-        leader = self.game.order_left_of_dealer()[0]
-        for trick_no in range(round_no):
-            order = [(leader + offset) % len(self.game.players) for offset in range(len(self.game.players))]
-            plays, led_suit = [], None
-            for player_index in order:
+
+        if active is None:
+            hands, trump_suit, trump_card, _ = self._deal_round()
+            self.wait_for_enter(
+                f"Round {len(self.game.results) + 1}: {round_no} cards each",
+                f"Trump card: {trump_card} — press ENTER",
+            )
+            # Shared bid workflow: same collection, validation and correction logic as in-person mode.
+            bids = review_bids(self.game, collect_bids(self.game, ui), ui)
+            active = {
+                "hands": {
+                    str(index): [self._card_data(card) for card in hand]
+                    for index, hand in hands.items()
+                },
+                "trump_suit": trump_suit.value,
+                "trump_card": self._card_data(trump_card),
+                "bids": bids,
+                "tricks_won": {player.name: 0 for player in self.game.players},
+                "leader": self.game.order_left_of_dealer()[0],
+                "trick_no": 0,
+                "plays": [],
+                "next_player_offset": 0,
+            }
+            self.game.active_round = active
+            self._save_checkpoint()
+        hands = {
+            int(index): [self._card_from_data(card) for card in cards]
+            for index, cards in active["hands"].items()
+        }
+        trump_suit = Suit(active["trump_suit"])
+        tricks_won = dict(active["tricks_won"])
+        leader = int(active["leader"])
+
+        while int(active["trick_no"]) < round_no:
+            trick_no = int(active["trick_no"])
+            order = [
+                (leader + offset) % len(self.game.players)
+                for offset in range(len(self.game.players))
+            ]
+            plays = [
+                (int(play[0]), self._card_from_data(play[1]))
+                for play in active["plays"]
+            ]
+            led_suit = plays[0][1].suit if plays else None
+
+            while int(active["next_player_offset"]) < len(self.game.players):
+                offset = int(active["next_player_offset"])
+                player_index = order[offset]
                 player = self.game.players[player_index]
-                self.wait_for_enter(f"Pass the device to {player.name}", "Keep the screen private; press ENTER")
+                self.wait_for_enter(
+                    f"Pass the device to {player.name}",
+                    "Keep the screen private; press ENTER",
+                )
                 card = self.choose_card(player, hands[player_index], led_suit, trump_suit, plays)
                 hands[player_index].remove(card)
-                led_suit = led_suit or card.suit
                 plays.append((player_index, card))
+                led_suit = led_suit or card.suit
+                active["hands"] = {
+                    str(index): [self._card_data(item) for item in hand]
+                    for index, hand in hands.items()
+                }
+                active["plays"] = [
+                    [index, self._card_data(item)] for index, item in plays
+                ]
+                active["next_player_offset"] = offset + 1
+                self.game.active_round = active
+                self._save_checkpoint()
+
             winner = trick_winner(plays, trump_suit)
             tricks_won[self.game.players[winner].name] += 1
             leader = winner
+            active.update({
+                "tricks_won": tricks_won,
+                "leader": leader,
+                "trick_no": trick_no + 1,
+                "plays": [],
+                "next_player_offset": 0,
+            })
+            self.game.active_round = active
+            self._save_checkpoint()
             self.wait_for_enter(f"{self.game.players[winner].name} wins trick {trick_no + 1}")
+
         tricks_won = review_tricks(self.game, tricks_won, ui)
-        return self.game.accept_round(bids, tricks_won, trump_suit)
+        result = self.game.accept_round(active["bids"], tricks_won, trump_suit)
+        self._save_checkpoint()
+        return result
 
     def run(self):
         """Run until normal completion or window close; always release Pygame."""

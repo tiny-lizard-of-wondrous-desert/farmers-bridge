@@ -1,1 +1,2 @@
+# Generated from the uv "online" dependency group. Do not edit by hand.
 streamlit>=1.40

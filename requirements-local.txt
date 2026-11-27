@@ -1,0 +1,2 @@
+# Generated from the uv "local" dependency group. Do not edit by hand.
+pygame-cards>=0.2.0

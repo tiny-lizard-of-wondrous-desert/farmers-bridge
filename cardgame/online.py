@@ -1,10 +1,11 @@
 """SQLite-backed shared room state for the Streamlit online-play MVP.
 
-The store is intentionally replaceable by a managed database adapter before public deployment.
+SQLite is the low-dependency state store; an optional private-file backup supports cloud recovery.
 """
 from __future__ import annotations
 import hashlib
 import json
+import logging
 import random
 import secrets
 import sqlite3
@@ -15,13 +16,22 @@ from uuid import uuid4
 from .engine import Game, RoundResult
 from .models import Card, Player, RANKS, Suit, legal_cards, trick_winner
 from .storage import CSVStore
+from .backup import GitHubFileBackup
 
 
 class OnlineRoomStore:
     def __init__(self, database: str | Path = "data/online_rooms.sqlite3"):
         """Initialize the shared room database and create its table if needed."""
-        self.database = Path(database)
+        requested_database = Path(database)
+        project_root = Path(__file__).resolve().parents[1]
+        self.database = requested_database if requested_database.is_absolute() else project_root / requested_database
         self.database.parent.mkdir(parents=True, exist_ok=True)
+        self.backup = GitHubFileBackup.from_environment()
+        if self.backup:
+            try:
+                self.backup.restore(self.database, "data/online_rooms.sqlite3")
+            except Exception:
+                logging.exception("Private online room backup restore failed")
         with self._connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, payload TEXT NOT NULL)")
 
@@ -39,7 +49,8 @@ class OnlineRoomStore:
         ).hex()
 
     def create_room(self, names: list[str], start_round: int, end_round: int,
-                    double_max: bool = True) -> tuple[str, dict[str, str]]:
+                    double_max: bool = True, player_ids: list[str] | None = None,
+                    require_pins: bool = True) -> tuple[str, dict[str, str]]:
         """Create a lobby and return its room code plus one-time player PINs."""
         clean = [name.strip() for name in names]
         if len(clean) < 2 or any(not n for n in clean):
@@ -49,13 +60,22 @@ class OnlineRoomStore:
         if start_round < 1 or end_round < start_round or end_round * len(clean) + 1 > 52:
             raise ValueError("Invalid round range for this number of players.")
         code = secrets.token_hex(3).upper()
-        credentials = {name: f"{secrets.randbelow(1_000_000):06d}" for name in clean}
+        if player_ids is not None and len(player_ids) != len(clean):
+            raise ValueError("A stable player ID is required for every player.")
+        credentials = {
+            name: f"{secrets.randbelow(1_000_000):06d}" if require_pins else ""
+            for name in clean
+        }
         player_rows = []
-        for name in clean:
+        for index, name in enumerate(clean):
             salt = secrets.token_hex(16)
-            player_rows.append({"name": name, "player_id": uuid4().hex[:12],
-                                "pin_salt": salt,
-                                "pin_hash": self._hash(credentials[name], salt)})
+            player_rows.append({
+                "name": name,
+                "player_id": player_ids[index] if player_ids else uuid4().hex[:12],
+                "pin_enabled": require_pins,
+                "pin_salt": salt,
+                "pin_hash": self._hash(credentials[name], salt) if require_pins else "",
+            })
         payload = {
             "players": player_rows,
             "start_round": start_round, "end_round": end_round,
@@ -68,6 +88,7 @@ class OnlineRoomStore:
         }
         with self._connect() as db:
             db.execute("INSERT INTO rooms(code,payload) VALUES (?,?)", (code, json.dumps(payload)))
+        self._sync_backup("Create online game room")
         return code, credentials
 
     def load(self, code: str) -> dict | None:
@@ -87,7 +108,16 @@ class OnlineRoomStore:
             mutation(state)
             db.execute("UPDATE rooms SET payload=? WHERE code=?", (json.dumps(state), code.upper()))
             db.commit()
-            return state
+        self._sync_backup("Save online room state")
+        return state
+
+    def _sync_backup(self, message: str) -> None:
+        if not self.backup:
+            return
+        try:
+            self.backup.sync(self.database, "data/online_rooms.sqlite3", message)
+        except Exception:
+            logging.exception("Private online room backup sync failed")
 
     def authenticate(self, code: str, player_name: str, pin: str) -> bool:
         """Verify a player's PIN against the room's stored hash."""
@@ -95,7 +125,11 @@ class OnlineRoomStore:
         if not state:
             return False
         player = next((p for p in state["players"] if p["name"].casefold() == player_name.casefold()), None)
-        return bool(player and secrets.compare_digest(
+        if not player:
+            return False
+        if not player.get("pin_enabled", True):
+            return not pin
+        return bool(pin and secrets.compare_digest(
             player["pin_hash"], self._hash(pin, player["pin_salt"])
         ))
 
@@ -290,8 +324,11 @@ class OnlineRoomStore:
                     tricks=dict(result["tricks"]), points=dict(result["points"]),
                     scores=dict(result["scores"]),
                 ))
-            game = Game(players, sequence, state["dealer_index"], len(sequence), results,
-                        state["start_round"], state["end_round"])
+            game = Game(
+                players, sequence, state["dealer_index"], len(sequence), results,
+                state["start_round"], state["end_round"],
+                game_id=f"online-{code.upper()}",
+            )
             game_id, game_number = CSVStore(data_dir).record_game(game)
             state["history_saved"] = True
             state["history_game_id"] = game_id

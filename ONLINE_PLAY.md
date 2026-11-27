@@ -4,7 +4,7 @@
 
 `streamlit_app.py` is a playable multi-browser MVP backed by `cardgame/online.py`:
 
-- Create a room and generate a private PIN for each named player.
+- Create a room and optionally generate a private PIN for each named player.
 - Each player connects from a separate browser using the room code, their name and PIN.
 - The host starts the game; bidding starts left of the dealer and the dealer bids last.
 - Each player sees only their own hand. The server-side room state contains all hands, but the UI only renders the connected player's hand.
@@ -13,44 +13,51 @@
 - There is a trick-review phase in which the host can correct trick totals; totals must still equal the number of tricks in the round.
 - At game completion, the host can save the game into the same `data/game_history.csv` format used by the local modes.
 
-The current repository uses SQLite with transactions. It supports multiple browser sessions connected to the same running app process. It is a functional prototype, not yet a hardened public multiplayer service: it does not have account authentication, robust session recovery, room expiry, rate limiting, or protection against an untrusted host.
+The app uses SQLite transactions (Python standard library) for live room state and CSV for player identities and game history. Streamlit fragments refresh the shared game view every three seconds. The SQLite room database records every bid, correction, card play and scoring transition, so a player can reconnect after a browser refresh or server restart if the data directory is restored.
+
+For a public Streamlit deployment, the app can back up its SQLite and CSV files to a **separate private GitHub repository**. This is an optional durable storage adapter implemented with Python's standard library; it does not require Supabase, Postgres or another Python package. A backup is committed after each room-state mutation and after player/history CSV changes. The private repository must be created separately and must not be the public source-code repository.
 
 ## Free deployment
 
-A no-cost starting combination is:
+A low-dependency deployment is:
 
 - **Streamlit Community Cloud** for hosting the Streamlit application.
-- **Supabase Free** for shared PostgreSQL persistence once the local SQLite adapter is replaced.
+- **SQLite + CSV** for the app's local data format.
+- **A separate private GitHub repository** as the optional durable backup target.
 
-Streamlit Community Cloud currently offers free app deployment. <https://docs.streamlit.io/deploy/streamlit-community-cloud> Supabase currently lists a $0 Free plan with a 500 MB database allowance, but free projects pause after one week of inactivity. <https://supabase.com/pricing> Free plans have usage limits and may change. A Streamlit deployment using the current local SQLite database can lose room state and CSV files when the app restarts or redeploys. It is suitable for local tests and short demonstrations, not durable online game history. For a game night where the room must survive restarts, move the room and history persistence to Supabase/Postgres before deploying.
+Streamlit Community Cloud supports free app deployment. <https://docs.streamlit.io/deploy/streamlit-community-cloud>. Its app filesystem should not be treated as durable storage: without an external backup, room state and CSV files may disappear after a restart or redeploy. The private backup adapter restores data on startup and uploads a fresh snapshot after every room mutation and CSV update. This is crash/restart recovery, not a high-availability multi-region database: it depends on GitHub availability, API limits, and a single active app instance. For larger traffic or simultaneous multi-instance hosting, use a transactional managed database instead.
 
 ## Deploy the Streamlit app for free
 
 1. Push this project to a GitHub repository.
 2. Create a Streamlit Community Cloud account and deploy `streamlit_app.py` from that repository.
 3. Community Cloud reads `requirements.txt`, which includes Streamlit.
-4. For persistent shared rooms, first implement the Supabase/Postgres adapter described above; do not deploy the SQLite version for games that must survive app restarts.
+4. For persistent shared rooms, create a separate **private** GitHub repository for backups and configure the Streamlit secrets below before inviting players.
 
 Streamlit documents the free Community Cloud deployment flow here: <https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy>.
 
 ## Run locally
 
 ```bash
-uv sync
-uv pip install -r requirements-web.txt
-uv run streamlit run streamlit_app.py
+uv sync --no-default-groups --group online
+uv run --no-sync streamlit run streamlit_app.py
 ```
 
-Open the displayed local URL in separate browser windows/devices. Create a room, share each player's PIN privately, and connect each player. The first listed player is the host.
+For local backup testing, set `FARMERS_BRIDGE_BACKUP_REPO`, `FARMERS_BRIDGE_BACKUP_TOKEN`
+and optionally `FARMERS_BRIDGE_BACKUP_BRANCH` as environment variables. The same adapter works
+locally and on Streamlit.
 
-## Before inviting the public
+Open the displayed local URL in separate browser windows/devices. Create a room, optionally share each player's PIN privately, and connect each player. The first listed player is the host.
 
-1. Replace SQLite with Supabase/Postgres and use server-side transactions for all state changes.
-2. Add proper player authentication or expiring signed invite tokens; the six-character room code is not authentication.
-3. Add database row-level security so each player can retrieve only their own hand.
-4. Add session reconnect/recovery, room expiry, host handoff, rate limits and audit logs.
-5. Add concurrency tests for simultaneous turns and unauthorized requests.
-6. Store game history in the managed database or periodically export it; do not rely on Streamlit's local filesystem for persistence.
+
+## Recovery behaviour
+
+- **In person:** local JSON checkpoint after every completed round. Resume from the last completed round after restarting the program.
+- **Pygame:** local JSON checkpoint after every card play and trick. It restores hands, bids, trick leader and a partially played trick.
+- **Online:** SQLite transaction after every state change. Reconnect with the same room code and username/PIN. With private backup configured, the database and CSVs are restored after a Streamlit restart/redeploy.
+- If the process stops during manual bid/trick entry, that unfinished input phase must be re-entered; the last completed round remains saved.
+
+The GitHub backup is intended for one running Streamlit app instance and small game-night datasets. It is not a high-availability database: it depends on GitHub availability, API limits and a single active app instance. Add stronger authentication, room expiry, host handoff, rate limits and concurrency tests before exposing the app widely.
 
 ## Privacy note
 

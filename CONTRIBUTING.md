@@ -45,3 +45,36 @@ Add tests for new rules, invalid input, normal completion, and relevant interfac
 - [ ] CSV migrations preserve historical records.
 - [ ] Documentation and changelog are updated.
 - [ ] No secrets, player PINs or personal records are committed.
+
+
+## Dependency groups and pre-commit
+
+The project uses uv dependency groups:
+
+```powershell
+uv sync --group dev
+uv sync --group local
+uv sync --group online
+uv run pre-commit install
+```
+
+The pre-commit hook updates `uv.lock` and exports `requirements.txt` (online),
+`requirements-local.txt` (local) and `requirements-dev.txt` (dev) before every commit.
+Do not edit generated requirement exports by hand; edit the corresponding group in
+`pyproject.toml` instead.
+
+## Private player data
+
+Player names, history CSVs, SQLite room state and recovery checkpoints are local data
+and must not be committed to the public source repository. If any data files were
+previously tracked, untrack them without deleting local copies:
+
+```powershell
+git rm --cached data/players.csv data/game_history.csv
+git rm --cached -r data/saves
+git commit -m "Stop tracking local player data"
+```
+
+Use pseudonymous usernames rather than real names, emails or other personal details.
+For Streamlit persistence, use the separate private backup repository described in
+`ONLINE_PLAY.md`; keep its token in Streamlit Secrets.
