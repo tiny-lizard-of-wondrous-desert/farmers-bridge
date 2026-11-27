@@ -18,6 +18,7 @@ from uuid import uuid4
 from .backup import GitHubFileBackup
 from .engine import Game, RoundResult
 from .models import RANKS, Card, Player, Suit, legal_cards, trick_winner
+from .names import clean_player_name
 from .storage import CSVStore
 
 
@@ -64,15 +65,20 @@ class OnlineRoomStore:
         double_max: bool = True,
         player_ids: list[str] | None = None,
         require_pins: bool = True,
+        expected_players: int | None = None,
     ) -> tuple[str, dict[str, str]]:
-        """Create a lobby and return its room code plus one-time player PINs."""
-        clean = [name.strip() for name in names]
-        if len(clean) < 2 or any(not n for n in clean):
-            raise ValueError("Enter at least two nonblank player names.")
+        """Create a lobby; players other than the host join and enter their own names."""
+        clean = [clean_player_name(name) for name in names]
+        if len(clean) < 1 or any(not n for n in clean):
+            raise ValueError("Enter the host's username.")
+        if expected_players is not None and (expected_players < 2 or expected_players < len(clean)):
+            raise ValueError("A game requires at least two player seats.")
         if len({n.casefold() for n in clean}) != len(clean):
             raise ValueError("Player names must be unique.")
-        if start_round < 1 or end_round < start_round or end_round * len(clean) + 1 > 52:
-            raise ValueError("Invalid round range for this number of players.")
+        if start_round < 1 or end_round < start_round:
+            raise ValueError("Invalid round range.")
+        if expected_players is not None and end_round * expected_players + 1 > 52:
+            raise ValueError("The selected round range is too large for that many players.")
         code = secrets.token_hex(3).upper()
         if player_ids is not None and len(player_ids) != len(clean):
             raise ValueError("A stable player ID is required for every player.")
@@ -87,12 +93,15 @@ class OnlineRoomStore:
                     "name": name,
                     "player_id": player_ids[index] if player_ids else uuid4().hex[:12],
                     "pin_enabled": require_pins,
+                    "joined": True,
                     "pin_salt": salt,
                     "pin_hash": self._hash(credentials[name], salt) if require_pins else "",
                 }
             )
         payload = {
             "players": player_rows,
+            "expected_players": expected_players,
+            "require_pins": require_pins,
             "start_round": start_round,
             "end_round": end_round,
             "double_max": double_max,
@@ -146,6 +155,40 @@ class OnlineRoomStore:
             self.backup.sync(self.database, "data/online_rooms.sqlite3", message)
         except Exception:
             logging.exception("Private online room backup sync failed")
+
+    def join_lobby(
+        self, code: str, player_name: str, pin: str = "", player_id: str | None = None
+    ) -> bool:
+        """Register a player's own username in an open lobby."""
+        clean = clean_player_name(player_name)
+        if not clean:
+            raise ValueError("Enter a username.")
+
+        def mutation(state):
+            if state["status"] != "lobby":
+                raise ValueError("This game has already started.")
+            if any(p["name"].casefold() == clean.casefold() for p in state["players"]):
+                raise ValueError("That username is already in this lobby.")
+            expected = state.get("expected_players")
+            if expected is not None and len(state["players"]) >= expected:
+                raise ValueError("This lobby is full.")
+            if (len(state["players"]) + 1) * state["end_round"] + 1 > 52:
+                raise ValueError("Too many players for the selected maximum hand size.")
+            if state.get("require_pins", True) and not pin:
+                raise ValueError("This room requires you to choose a PIN.")
+            salt = secrets.token_hex(16)
+            state["players"].append({
+                "name": clean,
+                "player_id": player_id or uuid4().hex[:12],
+                "pin_enabled": state.get("require_pins", True),
+                "joined": True,
+                "pin_salt": salt,
+                "pin_hash": self._hash(pin, salt) if state.get("require_pins", True) else "",
+            })
+            state["scores"][clean] = 0
+
+        self._mutate(code, mutation)
+        return True
 
     def authenticate(self, code: str, player_name: str, pin: str) -> bool:
         """Verify a player's PIN against the room's stored hash."""
@@ -206,6 +249,13 @@ class OnlineRoomStore:
                 raise ValueError("Only the host can start the game.")
             if state["status"] != "lobby":
                 raise ValueError("Game has already started.")
+            expected = state.get("expected_players")
+            if expected is not None and len(state["players"]) != expected:
+                raise ValueError("Waiting for all player seats to be filled.")
+            if len(state["players"]) < 2:
+                raise ValueError("At least two players must join before the game can start.")
+            if len(state["players"]) * state["end_round"] + 1 > 52:
+                raise ValueError("Too many players for the selected maximum hand size.")
             state["round_sequence"] = list(range(state["start_round"], state["end_round"] + 1))
             down_start = state["end_round"] if state["double_max"] else state["end_round"] - 1
             state["round_sequence"] += list(range(down_start, state["start_round"] - 1, -1))

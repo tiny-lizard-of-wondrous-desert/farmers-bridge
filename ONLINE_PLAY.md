@@ -62,3 +62,12 @@ The GitHub backup is intended for one running Streamlit app instance and small g
 ## Privacy note
 
 The app's rendering layer only displays the connected player's hand, but the SQLite-backed prototype is not a security boundary against a malicious host or a compromised app server. Do not use real-money stakes or sensitive account data with this prototype.
+
+
+## Lobby joining
+
+The host creates a room with their own username and the number of player seats.
+Each remaining player joins with the room code and enters their own username; if
+PINs are enabled, each joining player chooses their own PIN. The lobby shows
+registered players and the remaining open seats, and the host cannot start until
+all seats are filled. Use pseudonymous usernames rather than real names.

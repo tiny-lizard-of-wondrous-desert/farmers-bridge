@@ -70,3 +70,83 @@ def test_optional_player_pins_and_stable_ids(tmp_path):
     assert store.authenticate(code, "Ada", "")
     assert not store.authenticate(code, "Ada", "123456")
     assert store.load(code)["players"][0]["player_id"] == ids[0]
+
+
+
+def test_lobby_players_join_with_own_usernames_and_host_waits(tmp_path):
+    store = OnlineRoomStore(tmp_path / "joining.sqlite3")
+    code, _ = store.create_room(
+        ["Host"], 1, 1, False, require_pins=False, expected_players=3
+    )
+    assert store.load(code)["expected_players"] == 3
+    with pytest.raises(ValueError, match="Waiting for all player seats"):
+        store.start_game(code, "Host")
+    assert store.join_lobby(code, "Player Two")
+    assert store.join_lobby(code, "Player Three")
+    state = store.load(code)
+    assert [player["name"] for player in state["players"]] == [
+        "Host", "Player Two", "Player Three"
+    ]
+    assert all(player["joined"] for player in state["players"])
+    store.start_game(code, "Host")
+    assert store.load(code)["status"] == "bidding"
+
+
+def test_lobby_rejects_duplicate_or_excess_players(tmp_path):
+    store = OnlineRoomStore(tmp_path / "joining-limits.sqlite3")
+    code, _ = store.create_room(
+        ["Host"], 1, 1, False, require_pins=False, expected_players=2
+    )
+    with pytest.raises(ValueError, match="already in this lobby"):
+        store.join_lobby(code, "host")
+    store.join_lobby(code, "Guest")
+    with pytest.raises(ValueError, match="lobby is full"):
+        store.join_lobby(code, "Late")
+
+
+
+def test_lobby_joiner_sets_private_pin(tmp_path):
+    store = OnlineRoomStore(tmp_path / "joining-pins.sqlite3")
+    code, host_credentials = store.create_room(
+        ["Host"], 1, 1, False, require_pins=True, expected_players=2
+    )
+    assert store.authenticate(code, "Host", host_credentials["Host"])
+    with pytest.raises(ValueError, match="choose a PIN"):
+        store.join_lobby(code, "Guest")
+    store.join_lobby(code, "Guest", "246810", "stable-guest-id")
+    assert store.authenticate(code, "Guest", "246810")
+    assert not store.authenticate(code, "Guest", "000000")
+    assert store.load(code)["players"][1]["player_id"] == "stable-guest-id"
+
+
+def test_open_lobby_allows_any_number_of_players_until_host_starts(tmp_path):
+    store = OnlineRoomStore(tmp_path / "open-lobby.sqlite3")
+    code, _ = store.create_room(["Host"], 1, 2, False, require_pins=False)
+    assert store.load(code)["expected_players"] is None
+    with pytest.raises(ValueError, match="At least two"):
+        store.start_game(code, "Host")
+    for name in ("Guest 1", "Guest 2", "Guest 3"):
+        assert store.join_lobby(code, name)
+    assert len(store.load(code)["players"]) == 4
+    store.start_game(code, "Host")
+    assert store.load(code)["status"] == "bidding"
+
+
+def test_open_lobby_respects_physical_deck_capacity(tmp_path):
+    store = OnlineRoomStore(tmp_path / "deck-capacity.sqlite3")
+    code, _ = store.create_room(["Host"], 1, 13, False, require_pins=False)
+    store.join_lobby(code, "Guest 1")
+    store.join_lobby(code, "Guest 2")
+    with pytest.raises(ValueError, match="Too many players"):
+        store.join_lobby(code, "Guest 3")
+
+
+def test_usernames_keep_letters_numbers_and_common_symbols(tmp_path):
+    from cardgame.names import clean_player_name
+    from cardgame.storage import CSVStore
+
+    assert clean_player_name("  Alex<script> :) <3 !!!  ") == "Alexscript :) <3 !!!"
+    store = CSVStore(tmp_path / "players")
+    record = store.add_player("  Alex<script> :) <3 !!!  ")
+    assert record["name"] == "Alexscript :) <3 !!!"
+    assert store.add_player("Alex<script> :) <3 !!!")["player_id"] == record["player_id"]

@@ -4,30 +4,39 @@ A Python implementation of Farmer's Bridge with a shared game engine and three i
 
 
 ## To-dos for "Ready"
+
 First considerations
-- Make "lobby" mode show who's joined so far vs who's still coming
-- Make player names added as inputs instead of created by host?
-- At the end of a trick make a popup that says "so-and-so won", etc.
-- 11-13 should be letters not numbers
-- Check "your hand" organizes cards by suit + number (organizes by nothing currently)
-- Add cummulative score to table (with bids vs tricks) as a new column (leave "show score" button for individual rounds)
 
-Next:
-- Make cards visual to see/click on/scroll through (even just symbol would help)
-- At the very least add the "current trick cards" into the bids/tricks taken, etc.
-    - + mark whoever led the current round
+- [x] Make "lobby" mode show who's joined so far vs who's still coming.
+- [x] Make player names entered by each player when they join, rather than having the host create every player's identity. The host enters their own username and chooses the number of seats.
+- [x] At the end of a trick, show a popup announcing who won and the cards played.
+- [x] Display ranks 11–13 as J, Q, K (and 14 as A) rather than numbers.
+- [x] Sort "your hand" by suit, then rank.
+- [x] Add cumulative score to the bids/tricks table; keep "Current scores" for the round-by-round score view.
 
+## Next
 
-Possible considerations (unsure about how they would go - want to see layout options before adding):
-- Table (bids vs tricks) orders by "leading" -> last to bid/play
-    - Reorganizes as the round is played
-- Also add a column with the card played there + highlighting who is currently winning
-- Highlight the current player's row on the tricks vs bids based on who's bidding/playing next
-- Make cards show up closer to the game mat itself?
-    - Column in table
-    - Move bid dropdown to being a dropdown within the table if possible?
+Recommended implementation order:
 
+1. Add the current trick's cards directly to the player table, with a small "led" marker beside the player who led.
+2. Keep the current trick visible until the next trick begins; preserve the previous-trick history as a collapsible section.
+3. Use the same compact card notation in the hand, table and trick history (`7♠`, `J♥`, etc.) so players can scan the table quickly.
+4. On mobile, replace the side-by-side layout with a Hand / Game Mat tab or segmented switch, keeping the current-turn and score summary visible above it.
 
+This keeps the table as the primary shared view without duplicating card information in multiple places.
+
+## Possible considerations (design options; not yet implemented)
+
+- Reorder the player table from the player who leads to the last player in the current bidding/play order. The first row should carry a small "LEAD" label; the current player should be highlighted independently.
+- Add a "Card played" column and highlight the player currently winning the trick. Keep the played card in that player's row until the trick resolves.
+- Highlight the current player's row according to the active phase: next bidder during bidding, next player during card play.
+- Keep the hand visually close to the game mat on desktop; on mobile, use a dedicated hand/game-mat switch rather than forcing two narrow columns.
+- Put the bid selector in the player's table row only if it remains usable on narrow screens. Otherwise keep the bid control above the hand/table.
+- Card presentation options to compare:
+  - **Card face:** use the `pygame-cards` artwork style (white card, rounded border, corner rank/suit, large central suit pip).
+  - **Compact notation:** use a text card such as `7♠` for every card, with suit-aware color and consistent sizing. This is lighter, faster and more mobile-friendly.
+
+These are proposals only; choose a layout before implementing them.
 
 ## Project layout
 
@@ -123,3 +132,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), and [ONLIN
 - Pygame games checkpoint after every card play and trick, so the current hand and partial trick can be restored.
 - Online rooms persist each state transition in SQLite. Players reconnect with their room code, username and (if enabled) PIN.
 - For Streamlit hosting, configure the optional private GitHub backup in `ONLINE_PLAY.md`. It snapshots the SQLite room database and player/history CSV files after changes. This uses Python's standard library; no Postgres or Supabase dependency is required.
+
+### Online lobby usernames and player count
+
+The host can start an open lobby once at least two players have joined; there is no fixed seat count. Additional players may join until the host starts the game. The standard 52-card deck still limits the number of players for a selected maximum hand size. Usernames are normalized to letters, numbers, spaces, and common punctuation/emoticon symbols (for example `:)` and `<3`) before being saved. In the Streamlit hand panel, card faces are shown when the panel has enough width; compact rank/suit notation is used in narrow split-screen layouts.

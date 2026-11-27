@@ -56,3 +56,8 @@ Notable changes to gameplay, scoring, interfaces and developer tooling.
 - Added an adjustable hand/game-mat split, full-panel views, a score dialog and a continuously visible game table with round direction, bids, tricks, leader and turn.
 - Added current-round direction and score-table context to the in-person and Pygame interfaces.
 - Consolidated pip requirements into one all-groups `requirements.txt`; uv dependency groups remain independently selectable and tox uses those groups.
+- Reworked online lobby registration so the host enters only their own username and selects the number of seats; each other player joins with their own username, and the host sees joined players versus open seats.
+- Added a trick-winner popup showing the winning player and cards played.
+- Formatted face cards as J, Q, K and A; sorted online hands by suit and rank.
+- Added cumulative score to the bids/tricks table while retaining the current-scores dialog.
+- Added visual/layout proposals for the next table iteration to the README.

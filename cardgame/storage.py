@@ -10,6 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .backup import GitHubFileBackup
+from .names import clean_player_name
 
 
 class CSVStore:
@@ -76,7 +77,7 @@ class CSVStore:
             return list(csv.DictReader(stream))
 
     def add_player(self, name: str) -> dict[str, str]:
-        clean = name.strip()
+        clean = clean_player_name(name)
         if not clean:
             raise ValueError("Player name cannot be blank.")
         existing = self.load_players()
