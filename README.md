@@ -2,6 +2,33 @@
 
 A Python implementation of Farmer's Bridge with a shared game engine and three intended gameplay modes.
 
+
+## To-dos for "Ready"
+First considerations
+- Make "lobby" mode show who's joined so far vs who's still coming
+- Make player names added as inputs instead of created by host?
+- At the end of a trick make a popup that says "so-and-so won", etc.
+- 11-13 should be letters not numbers
+- Check "your hand" organizes cards by suit + number (organizes by nothing currently)
+- Add cummulative score to table (with bids vs tricks) as a new column (leave "show score" button for individual rounds)
+
+Next:
+- Make cards visual to see/click on/scroll through (even just symbol would help)
+- At the very least add the "current trick cards" into the bids/tricks taken, etc.
+    - + mark whoever led the current round
+
+
+Possible considerations (unsure about how they would go - want to see layout options before adding):
+- Table (bids vs tricks) orders by "leading" -> last to bid/play
+    - Reorganizes as the round is played
+- Also add a column with the card played there + highlighting who is currently winning
+- Highlight the current player's row on the tricks vs bids based on who's bidding/playing next
+- Make cards show up closer to the game mat itself?
+    - Column in table
+    - Move bid dropdown to being a dropdown within the table if possible?
+
+
+
 ## Project layout
 
 - `cardgame/models.py`: `Suit` enum, `Card`, `Player`, legal plays and trick winner. The game engine keeps its own lightweight domain-card model; Pygame artwork comes from the `pygame-cards` standard 52-card set.
