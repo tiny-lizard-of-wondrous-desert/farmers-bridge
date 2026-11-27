@@ -1,4 +1,5 @@
 """Optional local pass-and-play Pygame interface."""
+
 from __future__ import annotations
 
 import random
@@ -23,6 +24,7 @@ class WindowClosed(Exception):
 
 class PygamePrompts:
     """Adapter implementing the same prompts protocol as the console UI."""
+
     def __init__(self, table):
         self.table = table
 
@@ -53,8 +55,14 @@ class PygameTable:
         """Use pygame_cards' standard 52-card set for all card artwork."""
         library = {}
         rank_names = {
-            "jack": 11, "queen": 12, "king": 13, "ace": 14,
-            "j": 11, "q": 12, "k": 13, "a": 14,
+            "jack": 11,
+            "queen": 12,
+            "king": 13,
+            "ace": 14,
+            "j": 11,
+            "q": 12,
+            "k": 13,
+            "a": 14,
         }
         for library_card in CardSets.n52.copy():
             name = str(library_card.name)
@@ -135,7 +143,13 @@ class PygameTable:
             self.screen.fill(BG)
             self.text(title, WIDTH // 2, HEIGHT // 2 - 55, center=True)
             self.text(value or "_", WIDTH // 2, HEIGHT // 2 + 10, center=True)
-            self.text("Type a number and press ENTER", WIDTH // 2, HEIGHT // 2 + 70, self.small, center=True)
+            self.text(
+                "Type a number and press ENTER",
+                WIDTH // 2,
+                HEIGHT // 2 + 70,
+                self.small,
+                center=True,
+            )
             pygame.display.flip()
             self.clock.tick(30)
 
@@ -163,23 +177,34 @@ class PygameTable:
                     gap = 8
                     start_x = (WIDTH - (len(allowed) * card_width + (len(allowed) - 1) * gap)) // 2
                     for i, card in enumerate(allowed):
-                        rect = pygame.Rect(start_x + i * (card_width + gap), 550, card_width, card_height)
+                        rect = pygame.Rect(
+                            start_x + i * (card_width + gap), 550, card_width, card_height
+                        )
                         if rect.collidepoint(event.pos):
                             return card
             self.screen.fill(BG)
             self.text(
                 f"Round {len(self.game.results) + 1}: {self.game.current_round} cards — {self.game.round_direction}",
-                40, 15, self.small,
+                40,
+                15,
+                self.small,
             )
             self.text(
-                "Game table: " + " | ".join(
-                    f"{p.name}: {p.score}" for p in self.game.players
-                ),
-                40, 45, self.small,
+                "Game table: " + " | ".join(f"{p.name}: {p.score}" for p in self.game.players),
+                40,
+                45,
+                self.small,
             )
             self.text(f"{player.name}: choose a card", 40, 80)
-            self.text(f"Trump: {trump_suit.value} | Led suit: {getattr(led_suit, 'value', 'Lead')}", 40, 125, self.small)
-            self.text(f"Cards in trick: {len(plays)} / {len(self.game.players)}", 40, 160, self.small)
+            self.text(
+                f"Trump: {trump_suit.value} | Led suit: {getattr(led_suit, 'value', 'Lead')}",
+                40,
+                125,
+                self.small,
+            )
+            self.text(
+                f"Cards in trick: {len(plays)} / {len(self.game.players)}", 40, 160, self.small
+            )
             card_width = min(90, (WIDTH - 60 - 8 * (len(allowed) - 1)) // len(allowed))
             card_height = int(card_width * 1.55)
             gap = 8
@@ -217,9 +242,9 @@ class PygameTable:
             hands, trump_suit, trump_card, _ = self._deal_round()
             self.wait_for_enter(
                 f"Round {len(self.game.results) + 1}: {round_no} cards each — {self.game.round_direction}",
-                "Current game table: " + " | ".join(
-                    f"{player.name}: {player.score}" for player in self.game.players
-                ) + f" — Trump: {trump_card} — press ENTER",
+                "Current game table: "
+                + " | ".join(f"{player.name}: {player.score}" for player in self.game.players)
+                + f" — Trump: {trump_card} — press ENTER",
             )
             # Shared bid workflow: same collection, validation and correction logic as in-person mode.
             bids = review_bids(self.game, collect_bids(self.game, ui), ui)
@@ -253,10 +278,7 @@ class PygameTable:
                 (leader + offset) % len(self.game.players)
                 for offset in range(len(self.game.players))
             ]
-            plays = [
-                (int(play[0]), self._card_from_data(play[1]))
-                for play in active["plays"]
-            ]
+            plays = [(int(play[0]), self._card_from_data(play[1])) for play in active["plays"]]
             led_suit = plays[0][1].suit if plays else None
 
             while int(active["next_player_offset"]) < len(self.game.players):
@@ -275,9 +297,7 @@ class PygameTable:
                     str(index): [self._card_data(item) for item in hand]
                     for index, hand in hands.items()
                 }
-                active["plays"] = [
-                    [index, self._card_data(item)] for index, item in plays
-                ]
+                active["plays"] = [[index, self._card_data(item)] for index, item in plays]
                 active["next_player_offset"] = offset + 1
                 self.game.active_round = active
                 self._save_checkpoint()
@@ -285,13 +305,15 @@ class PygameTable:
             winner = trick_winner(plays, trump_suit)
             tricks_won[self.game.players[winner].name] += 1
             leader = winner
-            active.update({
-                "tricks_won": tricks_won,
-                "leader": leader,
-                "trick_no": trick_no + 1,
-                "plays": [],
-                "next_player_offset": 0,
-            })
+            active.update(
+                {
+                    "tricks_won": tricks_won,
+                    "leader": leader,
+                    "trick_no": trick_no + 1,
+                    "plays": [],
+                    "next_player_offset": 0,
+                }
+            )
             self.game.active_round = active
             self._save_checkpoint()
             self.wait_for_enter(f"{self.game.players[winner].name} wins trick {trick_no + 1}")
@@ -308,7 +330,9 @@ class PygameTable:
                 result = self.play_card_round()
                 if result is None:
                     break
-                self.wait_for_enter("Round complete", " | ".join(f"{n}: {s}" for n, s in result.scores.items()))
+                self.wait_for_enter(
+                    "Round complete", " | ".join(f"{n}: {s}" for n, s in result.scores.items())
+                )
             if self.game.is_complete:
                 self.wait_for_enter("Game complete!", "Press ENTER to close")
             return self.game.is_complete

@@ -1,4 +1,5 @@
 """Shared bid/trick collection and correction workflows for every interface."""
+
 from __future__ import annotations
 
 from typing import Protocol
@@ -63,7 +64,8 @@ def collect_tricks(game: Game, ui: Prompts) -> dict[str, int]:
         tricks = {
             game.players[i].name: ui.number(
                 f"Tricks won by {game.players[i].name} (0-{round_no})", round_no
-            ) for i in game.order_left_of_dealer()
+            )
+            for i in game.order_left_of_dealer()
         }
         try:
             game.validate_tricks(tricks)

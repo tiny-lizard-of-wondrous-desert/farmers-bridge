@@ -6,6 +6,7 @@ def test_add_player_deduplicates_names(tmp_path):
     alice = store.add_player("Alice")
     assert store.add_player("alice")["player_id"] == alice["player_id"]
 
+
 def test_record_game_includes_rounds_and_tied_ranks(tmp_path, players):
     store = CSVStore(tmp_path)
     game = Game.create(players, 1, 1, False)
@@ -19,17 +20,20 @@ def test_record_game_includes_rounds_and_tied_ranks(tmp_path, players):
     game.players[0].tricks = [1]
     game.players[1].tricks = [0]
     game.players[2].tricks = [0]
-    
+
     # Add a completed result to represent the finished one-round game.
     from cardgame.engine import RoundResult
-    game.results.append(RoundResult(1, {p.name: 0 for p in players},
-                                    {"Alice": 1, "Bob": 0, "Casey": 0}, {}, {}))
+
+    game.results.append(
+        RoundResult(1, {p.name: 0 for p in players}, {"Alice": 1, "Bob": 0, "Casey": 0}, {}, {})
+    )
     game.round_index = 1
     store.record_game(game, "2026-11-26")
     rows = store.load_history()
     assert {r["players_rank"] for r in rows if r["player_name"] in {"Alice", "Bob"}} == {"1"}
     assert next(r for r in rows if r["player_name"] == "Casey")["players_rank"] == "2"
     assert all(r["start_round"] == "1" and r["end_round"] == "1" for r in rows)
+
 
 def test_migrate_old_history_header(tmp_path):
     path = tmp_path / "game_history.csv"
@@ -55,13 +59,15 @@ def test_player_stats_persist_across_games(tmp_path):
     game.players[0].score = 20
     game.players[1].score = 10
     from cardgame.engine import RoundResult
-    game.results.append(RoundResult(
-        1, {"Ada": 0, "Bea": 0}, {"Ada": 1, "Bea": 0}, {}, {}
-    ))
+
+    game.results.append(RoundResult(1, {"Ada": 0, "Bea": 0}, {"Ada": 1, "Bea": 0}, {}, {}))
     game.round_index = 1
     store.record_game(game, "2026-11-26")
     assert store.get_player_stats(player["player_id"]) == {
-        "games_played": 1, "wins": 1, "total_points": 20, "average_points": 20.0
+        "games_played": 1,
+        "wins": 1,
+        "total_points": 20,
+        "average_points": 20.0,
     }
 
 

@@ -1,4 +1,5 @@
 """Interface-independent game state, validation, dealing and scoring."""
+
 from __future__ import annotations
 
 import random
@@ -32,9 +33,14 @@ class Game:
     game_id: str = field(default_factory=lambda: uuid4().hex[:12])
 
     @classmethod
-    def create(cls, players: list[Player], start_round: int = 1,
-               end_round: int = 7, double_max: bool = True,
-               dealer_index: int = 0) -> Game:
+    def create(
+        cls,
+        players: list[Player],
+        start_round: int = 1,
+        end_round: int = 7,
+        double_max: bool = True,
+        dealer_index: int = 0,
+    ) -> Game:
         """Create a game with its complete round schedule fixed up front."""
         if len(players) < 2:
             raise ValueError("A game requires at least two players.")
@@ -50,8 +56,9 @@ class Game:
         up = list(range(start_round, end_round + 1))
         down_start = end_round if double_max else end_round - 1
         down = list(range(down_start, start_round - 1, -1))
-        return cls(list(players), up + down, dealer_index,
-                   start_round=start_round, end_round=end_round)
+        return cls(
+            list(players), up + down, dealer_index, start_round=start_round, end_round=end_round
+        )
 
     @property
     def current_round(self) -> int | None:
@@ -111,8 +118,9 @@ class Game:
         if total != round_no:
             raise ValueError(f"Trick counts must add up to {round_no}; got {total}.")
 
-    def accept_round(self, bids: dict[str, int], tricks: dict[str, int],
-                     trump_suit: Suit | None = None) -> RoundResult | None:
+    def accept_round(
+        self, bids: dict[str, int], tricks: dict[str, int], trump_suit: Suit | None = None
+    ) -> RoundResult | None:
         """Validate both phases, score one round, and return None after game end."""
         if self.is_complete:
             return None
@@ -128,8 +136,14 @@ class Game:
             points[player.name] = player.score_round(
                 bids[player.name], tricks[player.name], round_no
             )
-        result = RoundResult(round_no, dict(bids), dict(tricks), points,
-                             {p.name: p.score for p in self.players}, trump_suit)
+        result = RoundResult(
+            round_no,
+            dict(bids),
+            dict(tricks),
+            points,
+            {p.name: p.score for p in self.players},
+            trump_suit,
+        )
         self.results.append(result)
         self.active_round = None
         self.round_index += 1
@@ -165,8 +179,13 @@ class Game:
         """Serialize enough game state to resume a local game."""
         return {
             "players": [
-                {"name": p.name, "player_id": p.player_id, "bids": p.bids,
-                 "tricks": p.tricks, "score": p.score}
+                {
+                    "name": p.name,
+                    "player_id": p.player_id,
+                    "bids": p.bids,
+                    "tricks": p.tricks,
+                    "score": p.score,
+                }
                 for p in self.players
             ],
             "round_sequence": self.round_sequence,
@@ -177,9 +196,14 @@ class Game:
             "active_round": self.active_round,
             "game_id": self.game_id,
             "results": [
-                {"round_number": r.round_number, "bids": r.bids, "tricks": r.tricks,
-                 "points": r.points, "scores": r.scores,
-                 "trump_suit": r.trump_suit.value if r.trump_suit else None}
+                {
+                    "round_number": r.round_number,
+                    "bids": r.bids,
+                    "tricks": r.tricks,
+                    "points": r.points,
+                    "scores": r.scores,
+                    "trump_suit": r.trump_suit.value if r.trump_suit else None,
+                }
                 for r in self.results
             ],
         }
@@ -188,21 +212,34 @@ class Game:
     def from_dict(cls, data: dict) -> Game:
         """Restore a game checkpoint without recalculating its round schedule."""
         players = [
-            Player(p["name"], p.get("player_id", ""), list(p.get("bids", [])),
-                   list(p.get("tricks", [])), int(p.get("score", 0)))
+            Player(
+                p["name"],
+                p.get("player_id", ""),
+                list(p.get("bids", [])),
+                list(p.get("tricks", [])),
+                int(p.get("score", 0)),
+            )
             for p in data["players"]
         ]
         results = [
             RoundResult(
-                int(r["round_number"]), dict(r["bids"]), dict(r["tricks"]),
-                dict(r["points"]), dict(r["scores"]),
+                int(r["round_number"]),
+                dict(r["bids"]),
+                dict(r["tricks"]),
+                dict(r["points"]),
+                dict(r["scores"]),
                 Suit(r["trump_suit"]) if r.get("trump_suit") else None,
             )
             for r in data.get("results", [])
         ]
         return cls(
-            players, list(data["round_sequence"]), int(data["dealer_index"]),
-            int(data["round_index"]), results, int(data["start_round"]),
-            int(data["end_round"]), data.get("active_round"),
+            players,
+            list(data["round_sequence"]),
+            int(data["dealer_index"]),
+            int(data["round_index"]),
+            results,
+            int(data["start_round"]),
+            int(data["end_round"]),
+            data.get("active_round"),
             data.get("game_id") or uuid4().hex[:12],
         )

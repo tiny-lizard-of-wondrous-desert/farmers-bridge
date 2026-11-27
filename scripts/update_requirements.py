@@ -1,4 +1,5 @@
 """Regenerate the uv lockfile and one pip requirements export before each commit."""
+
 from __future__ import annotations
 
 import shutil
@@ -27,8 +28,14 @@ def main() -> None:
         )
     run(uv, "lock")
     run(
-        uv, "export", "--locked", "--all-groups", "--no-hashes",
-        "--no-emit-project", "--output-file", "requirements.txt",
+        uv,
+        "export",
+        "--locked",
+        "--all-groups",
+        "--no-hashes",
+        "--no-emit-project",
+        "--output-file",
+        "requirements.txt",
     )
     run("git", "add", "uv.lock", "requirements.txt")
 

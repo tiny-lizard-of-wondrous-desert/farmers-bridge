@@ -2,6 +2,7 @@
 
 SQLite is the low-dependency state store; an optional private-file backup supports cloud recovery.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -25,7 +26,11 @@ class OnlineRoomStore:
         """Initialize the shared room database and create its table if needed."""
         requested_database = Path(database)
         project_root = Path(__file__).resolve().parents[1]
-        self.database = requested_database if requested_database.is_absolute() else project_root / requested_database
+        self.database = (
+            requested_database
+            if requested_database.is_absolute()
+            else project_root / requested_database
+        )
         self.database.parent.mkdir(parents=True, exist_ok=True)
         self.backup = GitHubFileBackup.from_environment()
         if self.backup:
@@ -34,7 +39,9 @@ class OnlineRoomStore:
             except Exception:
                 logging.exception("Private online room backup restore failed")
         with self._connect() as db:
-            db.execute("CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, payload TEXT NOT NULL)")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, payload TEXT NOT NULL)"
+            )
 
     def _connect(self):
         """Open a SQLite connection with a busy timeout and named columns."""
@@ -49,9 +56,15 @@ class OnlineRoomStore:
             "sha256", pin.encode("utf-8"), salt.encode("utf-8"), 200_000
         ).hex()
 
-    def create_room(self, names: list[str], start_round: int, end_round: int,
-                    double_max: bool = True, player_ids: list[str] | None = None,
-                    require_pins: bool = True) -> tuple[str, dict[str, str]]:
+    def create_room(
+        self,
+        names: list[str],
+        start_round: int,
+        end_round: int,
+        double_max: bool = True,
+        player_ids: list[str] | None = None,
+        require_pins: bool = True,
+    ) -> tuple[str, dict[str, str]]:
         """Create a lobby and return its room code plus one-time player PINs."""
         clean = [name.strip() for name in names]
         if len(clean) < 2 or any(not n for n in clean):
@@ -64,28 +77,42 @@ class OnlineRoomStore:
         if player_ids is not None and len(player_ids) != len(clean):
             raise ValueError("A stable player ID is required for every player.")
         credentials = {
-            name: f"{secrets.randbelow(1_000_000):06d}" if require_pins else ""
-            for name in clean
+            name: f"{secrets.randbelow(1_000_000):06d}" if require_pins else "" for name in clean
         }
         player_rows = []
         for index, name in enumerate(clean):
             salt = secrets.token_hex(16)
-            player_rows.append({
-                "name": name,
-                "player_id": player_ids[index] if player_ids else uuid4().hex[:12],
-                "pin_enabled": require_pins,
-                "pin_salt": salt,
-                "pin_hash": self._hash(credentials[name], salt) if require_pins else "",
-            })
+            player_rows.append(
+                {
+                    "name": name,
+                    "player_id": player_ids[index] if player_ids else uuid4().hex[:12],
+                    "pin_enabled": require_pins,
+                    "pin_salt": salt,
+                    "pin_hash": self._hash(credentials[name], salt) if require_pins else "",
+                }
+            )
         payload = {
             "players": player_rows,
-            "start_round": start_round, "end_round": end_round,
-            "double_max": double_max, "status": "lobby", "round_sequence": [],
-            "round_index": 0, "dealer_index": 0, "scores": {name: 0 for name in clean},
-            "hands": {}, "trump_suit": None, "trump_card": None,
-            "bids": {}, "bid_order": [], "bid_turn": 0, "tricks": {},
-            "leader_index": 0, "current_turn": 0, "trick_plays": [],
-            "trick_history": [], "round_results": [],
+            "start_round": start_round,
+            "end_round": end_round,
+            "double_max": double_max,
+            "status": "lobby",
+            "round_sequence": [],
+            "round_index": 0,
+            "dealer_index": 0,
+            "scores": {name: 0 for name in clean},
+            "hands": {},
+            "trump_suit": None,
+            "trump_card": None,
+            "bids": {},
+            "bid_order": [],
+            "bid_turn": 0,
+            "tricks": {},
+            "leader_index": 0,
+            "current_turn": 0,
+            "trick_plays": [],
+            "trick_history": [],
+            "round_results": [],
         }
         with self._connect() as db:
             db.execute("INSERT INTO rooms(code,payload) VALUES (?,?)", (code, json.dumps(payload)))
@@ -125,14 +152,16 @@ class OnlineRoomStore:
         state = self.load(code)
         if not state:
             return False
-        player = next((p for p in state["players"] if p["name"].casefold() == player_name.casefold()), None)
+        player = next(
+            (p for p in state["players"] if p["name"].casefold() == player_name.casefold()), None
+        )
         if not player:
             return False
         if not player.get("pin_enabled", True):
             return not pin
-        return bool(pin and secrets.compare_digest(
-            player["pin_hash"], self._hash(pin, player["pin_salt"])
-        ))
+        return bool(
+            pin and secrets.compare_digest(player["pin_hash"], self._hash(pin, player["pin_salt"]))
+        )
 
     @staticmethod
     def _round(state):
@@ -152,15 +181,26 @@ class OnlineRoomStore:
                 card = deck.pop()
                 hands[str(i)].append([card.suit.value, card.rank])
         trump = deck.pop()
-        state.update({"hands": hands, "trump_suit": trump.suit.value,
-                      "trump_card": [trump.suit.value, trump.rank],
-                      "bids": {}, "bid_order": order, "bid_turn": 0,
-                      "tricks": {p["name"]: 0 for p in state["players"]},
-                      "leader_index": first, "current_turn": first,
-                      "trick_plays": [], "trick_history": [], "status": "bidding"})
+        state.update(
+            {
+                "hands": hands,
+                "trump_suit": trump.suit.value,
+                "trump_card": [trump.suit.value, trump.rank],
+                "bids": {},
+                "bid_order": order,
+                "bid_turn": 0,
+                "tricks": {p["name"]: 0 for p in state["players"]},
+                "leader_index": first,
+                "current_turn": first,
+                "trick_plays": [],
+                "trick_history": [],
+                "status": "bidding",
+            }
+        )
 
     def start_game(self, code: str, host_name: str):
         """Start the room and deal its first round; only the host may do so."""
+
         def mutation(state):
             if state["players"][0]["name"] != host_name:
                 raise ValueError("Only the host can start the game.")
@@ -170,10 +210,12 @@ class OnlineRoomStore:
             down_start = state["end_round"] if state["double_max"] else state["end_round"] - 1
             state["round_sequence"] += list(range(down_start, state["start_round"] - 1, -1))
             self._deal(state)
+
         return self._mutate(code, mutation)
 
     def submit_bid(self, code: str, player_name: str, bid: int):
         """Submit the current player's bid and advance the bidding turn."""
+
         def mutation(state):
             if state["status"] != "bidding":
                 raise ValueError("Bidding is not open.")
@@ -192,13 +234,17 @@ class OnlineRoomStore:
             if state["bid_turn"] >= len(state["bid_order"]):
                 # Use the same engine validation used by the other interfaces.
                 players = [Player(p["name"]) for p in state["players"]]
-                game = Game(players, state["round_sequence"], state["dealer_index"], state["round_index"])
+                game = Game(
+                    players, state["round_sequence"], state["dealer_index"], state["round_index"]
+                )
                 game.validate_bids(bids)
                 state["status"] = "bids_review"
+
         return self._mutate(code, mutation)
 
     def correct_bid(self, code: str, player_name: str, bid: int):
         """Update one player's bid during the bid-review phase."""
+
         def mutation(state):
             if state["status"] != "bids_review":
                 raise ValueError("Bid corrections are only available during bid review.")
@@ -208,23 +254,29 @@ class OnlineRoomStore:
             if type(bid) is not int or not 0 <= bid <= round_no:
                 raise ValueError(f"Bid must be between 0 and {round_no}.")
             state["bids"][player_name] = bid
+
         return self._mutate(code, mutation)
 
     def confirm_bids(self, code: str, host_name: str):
         """Validate the reviewed bids and open card play."""
+
         def mutation(state):
             if state["players"][0]["name"] != host_name:
                 raise ValueError("Only the host can confirm bids.")
             if state["status"] != "bids_review":
                 raise ValueError("Bids are not awaiting review.")
             players = [Player(p["name"]) for p in state["players"]]
-            game = Game(players, state["round_sequence"], state["dealer_index"], state["round_index"])
+            game = Game(
+                players, state["round_sequence"], state["dealer_index"], state["round_index"]
+            )
             game.validate_bids(state["bids"])
             state["status"] = "playing"
+
         return self._mutate(code, mutation)
 
     def play_card(self, code: str, player_name: str, suit: str, rank: int):
         """Validate and play a card, resolving the trick when all players act."""
+
         def mutation(state):
             if state["status"] != "playing":
                 raise ValueError("Card play is not open.")
@@ -238,16 +290,26 @@ class OnlineRoomStore:
                 raise ValueError("You must follow suit when you have a card of the led suit.")
             hand.remove(card)
             state["hands"][str(index)] = [[c.suit.value, c.rank] for c in hand]
-            state["trick_plays"].append({"player_index": index, "player": player_name,
-                                         "suit": card.suit.value, "rank": card.rank})
+            state["trick_plays"].append(
+                {
+                    "player_index": index,
+                    "player": player_name,
+                    "suit": card.suit.value,
+                    "rank": card.rank,
+                }
+            )
             n = len(state["players"])
             if len(state["trick_plays"]) == n:
-                plays = [(p["player_index"], Card(Suit(p["suit"]), p["rank"]))
-                         for p in state["trick_plays"]]
+                plays = [
+                    (p["player_index"], Card(Suit(p["suit"]), p["rank"]))
+                    for p in state["trick_plays"]
+                ]
                 winner = trick_winner(plays, Suit(state["trump_suit"]))
                 winner_name = state["players"][winner]["name"]
                 state["tricks"][winner_name] += 1
-                state["trick_history"].append({"plays": state["trick_plays"], "winner": winner_name})
+                state["trick_history"].append(
+                    {"plays": state["trick_plays"], "winner": winner_name}
+                )
                 state["trick_plays"] = []
                 state["leader_index"] = winner
                 if all(not cards for cards in state["hands"].values()):
@@ -256,23 +318,31 @@ class OnlineRoomStore:
                     state["current_turn"] = winner
             else:
                 state["current_turn"] = (index + 1) % n
+
         return self._mutate(code, mutation)
 
     def correct_trick_count(self, code: str, host_name: str, player_name: str, count: int):
         """Correct one player's trick total during the host review phase."""
+
         def mutation(state):
             if state["players"][0]["name"] != host_name:
                 raise ValueError("Only the host can correct trick totals.")
             if state["status"] != "round_review":
                 raise ValueError("Trick totals are not awaiting review.")
             round_no = self._round(state)
-            if player_name not in state["tricks"] or type(count) is not int or not 0 <= count <= round_no:
+            if (
+                player_name not in state["tricks"]
+                or type(count) is not int
+                or not 0 <= count <= round_no
+            ):
                 raise ValueError(f"Trick count must be between 0 and {round_no}.")
             state["tricks"][player_name] = count
+
         return self._mutate(code, mutation)
 
     def finalize_round(self, code: str, host_name: str):
         """Validate reviewed totals, score the round and deal the next one."""
+
         def mutation(state):
             if state["players"][0]["name"] != host_name:
                 raise ValueError("Only the host can finalize a round.")
@@ -280,8 +350,12 @@ class OnlineRoomStore:
                 raise ValueError("The round is not complete yet.")
             round_no = self._round(state)
             players_for_validation = [Player(p["name"]) for p in state["players"]]
-            validation_game = Game(players_for_validation, state["round_sequence"],
-                                   state["dealer_index"], state["round_index"])
+            validation_game = Game(
+                players_for_validation,
+                state["round_sequence"],
+                state["dealer_index"],
+                state["round_index"],
+            )
             validation_game.validate_bids(state["bids"])
             validation_game.validate_tricks(state["tricks"])
             players = [Player(p["name"]) for p in state["players"]]
@@ -292,19 +366,27 @@ class OnlineRoomStore:
                     state["bids"][player.name], state["tricks"][player.name], round_no
                 )
                 state["scores"][player.name] = player.score
-            state["round_results"].append({"round": round_no, "bids": dict(state["bids"]),
-                                            "tricks": dict(state["tricks"]),
-                                            "points": points, "scores": dict(state["scores"])})
+            state["round_results"].append(
+                {
+                    "round": round_no,
+                    "bids": dict(state["bids"]),
+                    "tricks": dict(state["tricks"]),
+                    "points": points,
+                    "scores": dict(state["scores"]),
+                }
+            )
             state["round_index"] += 1
             state["dealer_index"] = (state["dealer_index"] + 1) % len(state["players"])
             if state["round_index"] >= len(state["round_sequence"]):
                 state["status"] = "complete"
             else:
                 self._deal(state)
+
         return self._mutate(code, mutation)
 
     def save_to_history(self, code: str, host_name: str, data_dir: str | Path = "data"):
         """Write a completed online game into the same CSV history as local modes."""
+
         def mutation(state):
             if state["players"][0]["name"] != host_name:
                 raise ValueError("Only the host can save this game.")
@@ -320,18 +402,28 @@ class OnlineRoomStore:
             sequence = list(state["round_sequence"])
             results = []
             for result in state["round_results"]:
-                results.append(RoundResult(
-                    round_number=result["round"], bids=dict(result["bids"]),
-                    tricks=dict(result["tricks"]), points=dict(result["points"]),
-                    scores=dict(result["scores"]),
-                ))
+                results.append(
+                    RoundResult(
+                        round_number=result["round"],
+                        bids=dict(result["bids"]),
+                        tricks=dict(result["tricks"]),
+                        points=dict(result["points"]),
+                        scores=dict(result["scores"]),
+                    )
+                )
             game = Game(
-                players, sequence, state["dealer_index"], len(sequence), results,
-                state["start_round"], state["end_round"],
+                players,
+                sequence,
+                state["dealer_index"],
+                len(sequence),
+                results,
+                state["start_round"],
+                state["end_round"],
                 game_id=f"online-{code.upper()}",
             )
             game_id, game_number = CSVStore(data_dir).record_game(game)
             state["history_saved"] = True
             state["history_game_id"] = game_id
             state["history_game_number"] = game_number
+
         return self._mutate(code, mutation)

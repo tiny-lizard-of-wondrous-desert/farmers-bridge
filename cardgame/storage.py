@@ -1,4 +1,5 @@
 """CSV persistence for player directory and completed game history."""
+
 from __future__ import annotations
 
 import csv
@@ -13,14 +14,29 @@ from .backup import GitHubFileBackup
 
 class CSVStore:
     PLAYER_FIELDS = ["player_id", "name", "created_at"]
-    HISTORY_FIELDS = ["game_id", "date", "game_number", "start_round", "end_round",
-                     "rounds_played", "player_id", "player_name", "bids", "tricks",
-                     "final_score", "players_rank", "winner", "winning_score"]
+    HISTORY_FIELDS = [
+        "game_id",
+        "date",
+        "game_number",
+        "start_round",
+        "end_round",
+        "rounds_played",
+        "player_id",
+        "player_name",
+        "bids",
+        "tricks",
+        "final_score",
+        "players_rank",
+        "winner",
+        "winning_score",
+    ]
 
     def __init__(self, data_dir="data"):
         project_root = Path(__file__).resolve().parents[1]
         requested_dir = Path(data_dir)
-        self.data_dir = requested_dir if requested_dir.is_absolute() else project_root / requested_dir
+        self.data_dir = (
+            requested_dir if requested_dir.is_absolute() else project_root / requested_dir
+        )
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.players_file = self.data_dir / "players.csv"
         self.history_file = self.data_dir / "game_history.csv"
@@ -67,8 +83,11 @@ class CSVStore:
         match = next((row for row in existing if row["name"].casefold() == clean.casefold()), None)
         if match:
             return match
-        row = {"player_id": uuid4().hex[:12], "name": clean,
-               "created_at": datetime.now().isoformat(timespec="seconds")}
+        row = {
+            "player_id": uuid4().hex[:12],
+            "name": clean,
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+        }
         with self.players_file.open("a", newline="", encoding="utf-8") as stream:
             csv.DictWriter(stream, fieldnames=self.PLAYER_FIELDS).writerow(row)
         self._sync_backup(self.players_file, "data/players.csv", "Update player directory")
@@ -98,6 +117,7 @@ class CSVStore:
         if not self.checkpoint_file.exists():
             return None
         from .engine import Game
+
         return Game.from_dict(json.loads(self.checkpoint_file.read_text(encoding="utf-8")))
 
     def clear_checkpoint(self) -> None:
@@ -118,26 +138,33 @@ class CSVStore:
         if existing:
             return game_id, int(existing["game_number"])
         played_on = played_on or date.today().isoformat()
-        game_number = 1 + max((int(row["game_number"]) for row in history
-                               if row["date"] == played_on), default=0)
+        game_number = 1 + max(
+            (int(row["game_number"]) for row in history if row["date"] == played_on), default=0
+        )
         high_score = max(player.score for player in game.players)
         rankings = game.rankings()
         rounds_played = len(game.results)
         with self.history_file.open("a", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(stream, fieldnames=self.HISTORY_FIELDS)
             for player in game.players:
-                writer.writerow({
-                    "game_id": game_id, "date": played_on, "game_number": game_number,
-                    "start_round": game.start_round,
-                    "end_round": game.end_round,
-                    "rounds_played": rounds_played, "player_id": player.player_id,
-                    "player_name": player.name,
-                    "bids": "|".join(map(str, player.bids[-rounds_played:])),
-                    "tricks": "|".join(map(str, player.tricks[-rounds_played:])),
-                    "final_score": player.score, "players_rank": rankings[player.name],
-                    "winner": "yes" if rankings[player.name] == 1 else "no",
-                    "winning_score": high_score,
-                })
+                writer.writerow(
+                    {
+                        "game_id": game_id,
+                        "date": played_on,
+                        "game_number": game_number,
+                        "start_round": game.start_round,
+                        "end_round": game.end_round,
+                        "rounds_played": rounds_played,
+                        "player_id": player.player_id,
+                        "player_name": player.name,
+                        "bids": "|".join(map(str, player.bids[-rounds_played:])),
+                        "tricks": "|".join(map(str, player.tricks[-rounds_played:])),
+                        "final_score": player.score,
+                        "players_rank": rankings[player.name],
+                        "winner": "yes" if rankings[player.name] == 1 else "no",
+                        "winning_score": high_score,
+                    }
+                )
         self._sync_backup(self.history_file, "data/game_history.csv", "Save completed game history")
         return game_id, game_number
 

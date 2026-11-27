@@ -6,9 +6,7 @@ from cardgame.backup import GitHubFileBackup
 def test_restore_private_backup_file(tmp_path, monkeypatch):
     backup = GitHubFileBackup("owner/private-data", "token")
     content = base64.b64encode(b"persistent state").decode("ascii")
-    monkeypatch.setattr(
-        backup, "_request", lambda method, path, payload=None: {"content": content}
-    )
+    monkeypatch.setattr(backup, "_request", lambda method, path, payload=None: {"content": content})
     destination = tmp_path / "state.json"
     assert backup.restore(destination, "test/restore-state.json")
     assert destination.read_bytes() == b"persistent state"

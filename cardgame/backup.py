@@ -3,6 +3,7 @@
 Uses only the Python standard library. Keep the token in Streamlit secrets or an
 environment variable; never commit it or put player data in the public app repo.
 """
+
 from __future__ import annotations
 
 import base64
@@ -40,7 +41,9 @@ class GitHubFileBackup:
             url += f"?ref={urllib.parse.quote(self.branch)}"
         body = json.dumps(payload).encode() if payload is not None else None
         request = urllib.request.Request(
-            url, data=body, method=method,
+            url,
+            data=body,
+            method=method,
             headers={
                 "Accept": "application/vnd.github+json",
                 "Authorization": f"Bearer {self.token}",
@@ -74,8 +77,10 @@ class GitHubFileBackup:
             elif result.get("download_url"):
                 request = urllib.request.Request(
                     result["download_url"],
-                    headers={"Authorization": f"Bearer {self.token}",
-                             "User-Agent": "farmers-bridge-backup"},
+                    headers={
+                        "Authorization": f"Bearer {self.token}",
+                        "User-Agent": "farmers-bridge-backup",
+                    },
                 )
                 with urllib.request.urlopen(request, timeout=20) as response:
                     data = response.read()

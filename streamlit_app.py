@@ -1,4 +1,5 @@
 """Multi-browser online play with durable SQLite state and live room refresh."""
+
 from __future__ import annotations
 
 import os
@@ -46,18 +47,14 @@ def show_scores(scores: dict, dealer: str, round_results: list[dict]):
     ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     unique_scores = sorted({score for _, score in ordered}, reverse=True)
     ranks = {score: index + 1 for index, score in enumerate(unique_scores)}
-    st.table([
-        {"Rank": ranks[score], "Player": player, "Score": score}
-        for player, score in ordered
-    ])
+    st.table(
+        [{"Rank": ranks[score], "Player": player, "Score": score} for player, score in ordered]
+    )
     st.caption(f"Dealer: {dealer}")
     if round_results:
         with st.expander("Round-by-round scores"):
             for result in round_results:
-                st.write(
-                    f"Round {result['round']} ({result['round']} cards): "
-                    f"{result['scores']}"
-                )
+                st.write(f"Round {result['round']} ({result['round']} cards): {result['scores']}")
 
 
 def render_landing_page():
@@ -74,12 +71,8 @@ def render_landing_page():
             names_text = st.text_area(
                 "Player usernames (one per line)", "Player 1\nPlayer 2\nPlayer 3"
             )
-            start_round = st.number_input(
-                "Starting hand size", min_value=1, max_value=13, value=1
-            )
-            end_round = st.number_input(
-                "Maximum hand size", min_value=1, max_value=13, value=7
-            )
+            start_round = st.number_input("Starting hand size", min_value=1, max_value=13, value=1)
+            end_round = st.number_input("Maximum hand size", min_value=1, max_value=13, value=7)
             double_max = st.checkbox("Play the maximum hand size twice", value=True)
             require_pins = st.checkbox("Require a private player PIN", value=True)
             create = st.form_submit_button("Create room", type="primary")
@@ -90,7 +83,10 @@ def render_landing_page():
                     raise ValueError("Enter at least two player usernames.")
                 player_records = [data_store.add_player(player_name) for player_name in names]
                 code, credentials = store.create_room(
-                    names, int(start_round), int(end_round), double_max,
+                    names,
+                    int(start_round),
+                    int(end_round),
+                    double_max,
                     player_ids=[record["player_id"] for record in player_records],
                     require_pins=require_pins,
                 )
@@ -166,13 +162,10 @@ def render_room(code: str, name: str):
         ordered = sorted(state["scores"].items(), key=lambda item: item[1], reverse=True)
         unique_scores = sorted(set(state["scores"].values()), reverse=True)
         ranks = {score: index + 1 for index, score in enumerate(unique_scores)}
-        st.table([
-            {"Rank": ranks[score], "Player": player, "Score": score}
-            for player, score in ordered
-        ])
-        if is_host and not state.get("history_saved") and st.button(
-            "Save game to player records"
-        ):
+        st.table(
+            [{"Rank": ranks[score], "Player": player, "Score": score} for player, score in ordered]
+        )
+        if is_host and not state.get("history_saved") and st.button("Save game to player records"):
             try:
                 store.save_to_history(code, name)
                 st.success("Game saved to player records.")
@@ -181,8 +174,7 @@ def render_room(code: str, name: str):
                 st.error(str(exc))
         elif state.get("history_saved"):
             st.success(
-                f"Saved as game #{state['history_game_number']} "
-                f"({state['history_game_id']})."
+                f"Saved as game #{state['history_game_number']} ({state['history_game_id']})."
             )
         return
 
@@ -205,15 +197,16 @@ def render_room(code: str, name: str):
         )
     with toolbar_right:
         if st.button("Current scores", use_container_width=True):
-            show_scores(
-                state["scores"], players[state["dealer_index"]], state["round_results"]
-            )
+            show_scores(state["scores"], players[state["dealer_index"]], state["round_results"])
 
     ratio = 50
     if panel_mode == "Split screen":
         ratio = st.slider(
             "Resize panels — hand / game mat",
-            min_value=25, max_value=75, value=50, step=5,
+            min_value=25,
+            max_value=75,
+            value=50,
+            step=5,
             help="Choose how much horizontal space each panel receives.",
             key="panel_ratio",
         )
@@ -231,24 +224,33 @@ def render_room(code: str, name: str):
         with hand_col:
             st.markdown("## Your hand")
             if state.get("hands") and state["status"] in {
-                "bidding", "bids_review", "playing", "round_review"
+                "bidding",
+                "bids_review",
+                "playing",
+                "round_review",
             }:
                 hand_cards = [
-                    Card(Suit(suit), int(rank))
-                    for suit, rank in state["hands"][str(player_index)]
+                    Card(Suit(suit), int(rank)) for suit, rank in state["hands"][str(player_index)]
                 ]
                 rank_names = {11: "J", 12: "Q", 13: "K", 14: "A"}
                 st.markdown("**Cards in your hand**")
-                st.write(" · ".join(
-                    f"{rank_names.get(card.rank, str(card.rank))} of {card.suit.value}"
-                    for card in hand_cards
-                ) if hand_cards else "No cards remaining.")
+                st.write(
+                    " · ".join(
+                        f"{rank_names.get(card.rank, str(card.rank))} of {card.suit.value}"
+                        for card in hand_cards
+                    )
+                    if hand_cards
+                    else "No cards remaining."
+                )
             if state["status"] == "bidding":
                 bid_index = state["bid_order"][state["bid_turn"]]
                 current_bidder = players[bid_index]
                 if current_bidder == name:
                     bid = st.number_input(
-                        "Your bid", min_value=0, max_value=round_no, step=1,
+                        "Your bid",
+                        min_value=0,
+                        max_value=round_no,
+                        step=1,
                         key=f"bid_{state['round_index']}_{name}",
                     )
                     if st.button("Submit bid", type="primary"):
@@ -263,8 +265,11 @@ def render_room(code: str, name: str):
                 st.write(f"Your current bid: **{state['bids'].get(name, '—')}**")
                 current_bid = state["bids"][name]
                 revised_bid = st.number_input(
-                    "Change your bid if needed", min_value=0,
-                    max_value=round_no, value=int(current_bid), step=1,
+                    "Change your bid if needed",
+                    min_value=0,
+                    max_value=round_no,
+                    value=int(current_bid),
+                    step=1,
                     key=f"review_bid_{state['round_index']}_{name}",
                 )
                 if st.button("Save my bid correction"):
@@ -281,15 +286,11 @@ def render_room(code: str, name: str):
                         st.error(str(exc))
             elif state["status"] == "playing":
                 hand = [
-                    Card(Suit(suit), int(rank))
-                    for suit, rank in state["hands"][str(player_index)]
+                    Card(Suit(suit), int(rank)) for suit, rank in state["hands"][str(player_index)]
                 ]
                 rank_names = {11: "J", 12: "Q", 13: "K", 14: "A"}
                 if state["current_turn"] == player_index:
-                    led = (
-                        Suit(state["trick_plays"][0]["suit"])
-                        if state["trick_plays"] else None
-                    )
+                    led = Suit(state["trick_plays"][0]["suit"]) if state["trick_plays"] else None
                     allowed = legal_cards(hand, led)
                     labels = {
                         f"{rank_names.get(card.rank, str(card.rank))} of {card.suit.value}": card
@@ -313,8 +314,11 @@ def render_room(code: str, name: str):
                     )
                     for player in players:
                         corrected = st.number_input(
-                            f"{player} tricks", min_value=0, max_value=round_no,
-                            value=int(state["tricks"][player]), step=1,
+                            f"{player} tricks",
+                            min_value=0,
+                            max_value=round_no,
+                            value=int(state["tricks"][player]),
+                            step=1,
                             key=f"trick_review_{state['round_index']}_{player}",
                         )
                         if st.button(
@@ -349,23 +353,27 @@ def render_room(code: str, name: str):
             else:
                 st.write(f"**Phase:** {state['status'].replace('_', ' ').title()}")
             st.markdown("### Bids called vs. tricks won")
-            st.table([
-                {
-                    "Player": player,
-                    "Bid called": state["bids"].get(player, "—"),
-                    "Tricks won": state["tricks"].get(player, 0),
-                }
-                for player in players
-            ])
+            st.table(
+                [
+                    {
+                        "Player": player,
+                        "Bid called": state["bids"].get(player, "—"),
+                        "Tricks won": state["tricks"].get(player, 0),
+                    }
+                    for player in players
+                ]
+            )
             st.markdown("### Current trick")
             if state["trick_plays"]:
-                st.table([
-                    {
-                        "Player": play["player"],
-                        "Card": f"{play['rank']} of {play['suit']}",
-                    }
-                    for play in state["trick_plays"]
-                ])
+                st.table(
+                    [
+                        {
+                            "Player": play["player"],
+                            "Card": f"{play['rank']} of {play['suit']}",
+                        }
+                        for play in state["trick_plays"]
+                    ]
+                )
             else:
                 st.caption("No cards played in this trick yet.")
             if state["trick_history"]:
@@ -379,6 +387,7 @@ def render_room(code: str, name: str):
 
 
 if "room_code" in st.session_state:
+
     @st.fragment(run_every="3s")
     def live_room(code: str, name: str):
         render_room(code, name)

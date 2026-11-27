@@ -36,7 +36,11 @@ def test_online_room_full_one_trick_game(tmp_path):
     store.finalize_round(code, "Ada")
     assert store.load(code)["status"] == "complete"
     store.save_to_history(code, "Ada", tmp_path / "history")
-    rows = __import__("cardgame.storage", fromlist=["CSVStore"]).CSVStore(tmp_path / "history").load_history()
+    rows = (
+        __import__("cardgame.storage", fromlist=["CSVStore"])
+        .CSVStore(tmp_path / "history")
+        .load_history()
+    )
     assert len(rows) == 2
     assert {row["players_rank"] for row in rows} == {"1", "2"}
 
@@ -61,9 +65,7 @@ def test_online_bid_review_rejects_dealer_forbidden_total(tmp_path):
 def test_optional_player_pins_and_stable_ids(tmp_path):
     store = OnlineRoomStore(tmp_path / "optional-pins.sqlite3")
     ids = ["saved-user-ada", "saved-user-bea"]
-    code, pins = store.create_room(
-        ["Ada", "Bea"], 1, 1, False, player_ids=ids, require_pins=False
-    )
+    code, pins = store.create_room(["Ada", "Bea"], 1, 1, False, player_ids=ids, require_pins=False)
     assert pins == {"Ada": "", "Bea": ""}
     assert store.authenticate(code, "Ada", "")
     assert not store.authenticate(code, "Ada", "123456")

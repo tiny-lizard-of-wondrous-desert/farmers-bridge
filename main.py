@@ -1,4 +1,5 @@
 """Interactive entry point for all three gameplay modes."""
+
 from __future__ import annotations
 
 import subprocess
@@ -21,8 +22,7 @@ def choose_players(store: CSVStore) -> list[Player]:
         for number, row in enumerate(records, 1):
             stats = store.get_player_stats(row["player_id"])
             print(
-                f"  {number}. {row['name']} "
-                f"({stats['games_played']} games, {stats['wins']} wins)"
+                f"  {number}. {row['name']} ({stats['games_played']} games, {stats['wins']} wins)"
             )
         raw = input("Choose number, NEW, or DONE: ").strip().casefold()
         if raw in {"done", "d"} and len(selected) >= 2:
@@ -51,7 +51,8 @@ def main() -> None:
         try:
             subprocess.run(
                 [sys.executable, "-m", "streamlit", "run", str(PROJECT_ROOT / "streamlit_app.py")],
-                check=False, cwd=PROJECT_ROOT,
+                check=False,
+                cwd=PROJECT_ROOT,
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
@@ -64,24 +65,35 @@ def main() -> None:
     store = CSVStore()
     game = store.load_checkpoint()
     if game is not None:
-        resume = input(
-            f"Found an unfinished game ({len(game.results)} completed rounds). "
-            "Resume it? [Y/n]: "
-        ).strip().casefold()
+        resume = (
+            input(
+                f"Found an unfinished game ({len(game.results)} completed rounds). "
+                "Resume it? [Y/n]: "
+            )
+            .strip()
+            .casefold()
+        )
         if resume not in {"n", "no", "f", "false"}:
             print("Resuming the saved game.")
         else:
             store.clear_checkpoint()
             game = None
     if game is not None and game.active_round is not None and mode != "2":
-        print("This checkpoint contains an unfinished Pygame round. Restart and choose mode 2 to resume it.")
+        print(
+            "This checkpoint contains an unfinished Pygame round. Restart and choose mode 2 to resume it."
+        )
         return
     if game is None:
         players = choose_players(store)
         max_round = 51 // len(players)
         start_round = int(input("Starting hand size [1]: ") or "1")
         end_round = int(input(f"Maximum hand size [{max_round}]: ") or str(max_round))
-        double_max = (input("Play maximum twice? [y/n]: ").strip().casefold() or "y") not in {"n", "no", "f", "false"}
+        double_max = (input("Play maximum twice? [y/n]: ").strip().casefold() or "y") not in {
+            "n",
+            "no",
+            "f",
+            "false",
+        }
         dealer = int(input(f"Initial dealer position (1-{len(players)}) [1]: ") or "1") - 1
         game = Game.create(players, start_round, end_round, double_max, dealer)
         store.save_checkpoint(game)
