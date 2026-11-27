@@ -34,10 +34,12 @@ Notable changes to gameplay, scoring, interfaces and developer tooling.
 - Added setup, optional dependency, test, lint, formatting and tox instructions.
 - Added `ONLINE_PLAY.md` with local setup, free-hosting guidance and the remaining production hardening steps.
 
+
 ## Pre-0.2.0
 - Initial score calculations and round/dealer progression.
 - Added player directory and CSV game history.
 - Added manual score entry and local Pygame pass-and-play prototype.
+
 
 ## Unreleased
 
