@@ -5,38 +5,37 @@ A Python implementation of Farmer's Bridge with a shared game engine and three i
 
 ## To-dos for "Ready"
 
-First considerations
+First considerations Fixes:
+- "trick complete" popup should also shows j/q/k/a instead of 11-14 -> use the compact version
+- Only host can update bids if needed -> or host gets "are all bids good" and if no, can select someone who is allowed to change their bid, and repeat until bids are fixed, etc. -> don't want silent bid changing mid game
+- Can "choose a card" be clicking on the displayed card (in both visual & compact mode)? Or does it need to be the dropdown? (If it needs to be the dropdown, make a default "please choose card" so players don't accidentally play the wrong card)
+- Move the "current trick" card display into the same table as the "bids vs tricks" table
+- Trump card should also be shown as a card (in compact mode or not)
+- "Round 3..." label should be below the resize slider, etc.
+- Round by round scores should show (bid: x, tricks:y, score:z)
+- Make a selection at the top for "show card faces vs compact mode" -> checkbox, etc. so that users can turn the card faces on/off as they please (for some/all of the viewing)
 
-- [x] Make "lobby" mode show who's joined so far vs who's still coming.
-- [x] Make player names entered by each player when they join, rather than having the host create every player's identity. The host enters their own username and chooses the number of seats.
-- [x] At the end of a trick, show a popup announcing who won and the cards played.
-- [x] Display ranks 11–13 as J, Q, K (and 14 as A) rather than numbers.
-- [x] Sort "your hand" by suit, then rank.
-- [x] Add cumulative score to the bids/tricks table; keep "Current scores" for the round-by-round score view.
 
 ## Next
 
 Recommended implementation order:
 
-1. Add the current trick's cards directly to the player table, with a small "led" marker beside the player who led.
-2. Keep the current trick visible until the next trick begins; preserve the previous-trick history as a collapsible section.
-3. Use the same compact card notation in the hand, table and trick history (`7♠`, `J♥`, etc.) so players can scan the table quickly.
-4. On mobile, replace the side-by-side layout with a Hand / Game Mat tab or segmented switch, keeping the current-turn and score summary visible above it.
+1. Add the current trick's cards directly to the player table, with a small "led" marker beside the player who led + a marker for "who is currently going to win this trick"
+2. Keep the previous trick visible until the current trick is completed
+3. On mobile, replace the side-by-side layout with a Hand / Game Mat tab or segmented switch, keeping the current-turn and score summary visible above it.
 
-This keeps the table as the primary shared view without duplicating card information in multiple places.
+- Add a "Card played" column and highlight the player currently winning the trick. Keep the played card in that player's row until the trick resolves.
+- Highlight the current player's row according to the active phase: next bidder during bidding, next player during card play.
+- Put the bid selector in the player's table row only if it remains usable on narrow screens. Otherwise keep the bid control above the hand/table.
+
 
 ## Possible considerations (design options; not yet implemented)
 
 - Reorder the player table from the player who leads to the last player in the current bidding/play order. The first row should carry a small "LEAD" label; the current player should be highlighted independently.
-- Add a "Card played" column and highlight the player currently winning the trick. Keep the played card in that player's row until the trick resolves.
-- Highlight the current player's row according to the active phase: next bidder during bidding, next player during card play.
 - Keep the hand visually close to the game mat on desktop; on mobile, use a dedicated hand/game-mat switch rather than forcing two narrow columns.
-- Put the bid selector in the player's table row only if it remains usable on narrow screens. Otherwise keep the bid control above the hand/table.
-- Card presentation options to compare:
-  - **Card face:** use the `pygame-cards` artwork style (white card, rounded border, corner rank/suit, large central suit pip).
-  - **Compact notation:** use a text card such as `7♠` for every card, with suit-aware color and consistent sizing. This is lighter, faster and more mobile-friendly.
 
 These are proposals only; choose a layout before implementing them.
+
 
 ## Project layout
 
