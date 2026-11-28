@@ -17,6 +17,11 @@ Implemented in the online Streamlit interface:
 - [x] The round/direction heading appears below the panel resize control.
 - [x] Round-by-round scores show each player's bid, tricks won, points earned and cumulative score.
 - [x] A card-face preference checkbox controls the hand display; narrow panels automatically use compact notation.
+- [x] The game mat uses four visually separated player-table groups: Player; Cumulative score/Bid/Tricks; Current card/markers; Last-trick card/markers.
+- [x] Current markers can appear together: LEAD, TURN and WILL WIN. WILL WIN identifies the current highest card in the in-progress trick, not a forecast of the game result.
+- [x] The last-trick group identifies the card played, who led (LED) and who won (WON); it does not show a turn marker.
+- [x] Once all bids are submitted, the game mat reports whether the round is overcalled or undercalled.
+- [x] Players choose a color when creating/joining a room. Colors are unique within a room, stored with the player, and used consistently in the lobby and player table.
 
 ### Next
 

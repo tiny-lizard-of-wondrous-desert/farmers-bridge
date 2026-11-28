@@ -5,6 +5,7 @@ SQLite is the low-dependency state store; an optional private-file backup suppor
 
 from __future__ import annotations
 
+import colorsys
 import hashlib
 import json
 import logging
@@ -20,6 +21,14 @@ from .engine import Game, RoundResult
 from .models import RANKS, Card, Player, Suit, legal_cards, trick_winner
 from .names import clean_player_name
 from .storage import CSVStore
+
+PLAYER_COLORS = {
+    f"Color {index + 1:02d}": "#" + "".join(
+        f"{round(channel * 255):02x}"
+        for channel in colorsys.hsv_to_rgb((index * 0.61803398875) % 1, 0.68, 0.78)
+    )
+    for index in range(52)
+}
 
 
 class OnlineRoomStore:
@@ -66,6 +75,7 @@ class OnlineRoomStore:
         player_ids: list[str] | None = None,
         require_pins: bool = True,
         expected_players: int | None = None,
+        player_colors: list[str] | None = None,
     ) -> tuple[str, dict[str, str]]:
         """Create a lobby; players other than the host join and enter their own names."""
         clean = [clean_player_name(name) for name in names]
@@ -85,12 +95,18 @@ class OnlineRoomStore:
         credentials = {
             name: f"{secrets.randbelow(1_000_000):06d}" if require_pins else "" for name in clean
         }
+        selected_colors = player_colors or [list(PLAYER_COLORS)[i % len(PLAYER_COLORS)] for i in range(len(clean))]
+        if len(selected_colors) != len(clean) or any(color not in PLAYER_COLORS for color in selected_colors):
+            raise ValueError("Choose a valid color for every player.")
+        if len(set(selected_colors)) != len(selected_colors):
+            raise ValueError("Every player must have a unique color.")
         player_rows = []
         for index, name in enumerate(clean):
             salt = secrets.token_hex(16)
             player_rows.append(
                 {
                     "name": name,
+                    "color": selected_colors[index],
                     "player_id": player_ids[index] if player_ids else uuid4().hex[:12],
                     "pin_enabled": require_pins,
                     "joined": True,
@@ -157,7 +173,8 @@ class OnlineRoomStore:
             logging.exception("Private online room backup sync failed")
 
     def join_lobby(
-        self, code: str, player_name: str, pin: str = "", player_id: str | None = None
+        self, code: str, player_name: str, pin: str = "", player_id: str | None = None,
+        player_color: str | None = None,
     ) -> bool:
         """Register a player's own username in an open lobby."""
         clean = clean_player_name(player_name)
@@ -176,9 +193,15 @@ class OnlineRoomStore:
                 raise ValueError("Too many players for the selected maximum hand size.")
             if state.get("require_pins", True) and not pin:
                 raise ValueError("This room requires you to choose a PIN.")
+            used_colors = {player.get("color") for player in state["players"]}
+            available_colors = [color for color in PLAYER_COLORS if color not in used_colors]
+            selected_color = player_color or (available_colors[0] if available_colors else None)
+            if selected_color not in PLAYER_COLORS or selected_color in used_colors:
+                raise ValueError("Choose an available player color.")
             salt = secrets.token_hex(16)
             state["players"].append({
                 "name": clean,
+                "color": selected_color,
                 "player_id": player_id or uuid4().hex[:12],
                 "pin_enabled": state.get("require_pins", True),
                 "joined": True,

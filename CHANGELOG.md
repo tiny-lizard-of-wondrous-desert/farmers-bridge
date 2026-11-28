@@ -43,6 +43,12 @@ Notable changes to gameplay, scoring, interfaces and developer tooling.
 
 ## Unreleased
 
+### Added
+- Streamlit player table split into four strongly separated groups: player identity; cumulative score/bid/tricks; current card/current markers; and last-trick card/LED/WON markers.
+- Current-trick markers can be shown together (LEAD, TURN, WILL WIN); the last-trick markers show LED and WON without a turn marker.
+- Round bid-total feedback reports overcalled, undercalled or exactly called after all bids are submitted.
+- Players choose a unique room color when creating or joining a lobby. Color assignments persist in the room state and are shown in the lobby and player table; a 52-color palette covers the deck-limited player count.
+
 - Added automatic local game checkpoints, including card-by-card Pygame recovery.
 - Added optional private GitHub file backups for Streamlit SQLite and CSV persistence; no Supabase/Postgres dependency is required.
 - Added automatic three-second Streamlit game-mat refresh and player win/score statistics tied to stable player IDs.

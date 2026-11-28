@@ -1,7 +1,6 @@
 import pytest
 
-from cardgame.online import OnlineRoomStore
-
+from cardgame.online import OnlineRoomStore, PLAYER_COLORS
 
 def test_online_room_full_one_trick_game(tmp_path):
     store = OnlineRoomStore(tmp_path / "rooms.sqlite3")
@@ -152,3 +151,33 @@ def test_usernames_keep_letters_numbers_and_common_symbols(tmp_path):
     record = store.add_player("  Alex<script> :) <3 !!!  ")
     assert record["name"] == "Alexscript :) <3 !!!"
     assert store.add_player("Alex<script> :) <3 !!!")["player_id"] == record["player_id"]
+
+
+def test_player_colors_are_unique_and_saved_for_each_room_member(tmp_path):
+    assert len(PLAYER_COLORS) == 52
+    assert len(set(PLAYER_COLORS.values())) == 52
+    store = OnlineRoomStore(tmp_path / "player-colors.sqlite3")
+    code, _ = store.create_room(
+        ["Host"], 1, 1, False, require_pins=False, player_colors=["Color 01"]
+    )
+    assert store.load(code)["players"][0]["color"] == "Color 01"
+    store.join_lobby(code, "Guest", player_color="Color 02")
+    state = store.load(code)
+    assert [player["color"] for player in state["players"]] == ["Color 01", "Color 02"]
+    assert len({player["color"] for player in state["players"]}) == 2
+    assert set(PLAYER_COLORS) >= {player["color"] for player in state["players"]}
+
+
+def test_player_colors_reject_duplicates_and_unavailable_colors(tmp_path):
+    store = OnlineRoomStore(tmp_path / "duplicate-colors.sqlite3")
+    with pytest.raises(ValueError, match="unique color"):
+        store.create_room(
+            ["Host", "Guest"], 1, 1, False, require_pins=False,
+            player_colors=["Color 01", "Color 01"],
+        )
+    code, _ = store.create_room(["Host"], 1, 1, False, require_pins=False)
+    with pytest.raises(ValueError, match="available player color"):
+        store.join_lobby(code, "Guest", player_color="Color 01")
+    store.join_lobby(code, "Guest", player_color="Color 02")
+    with pytest.raises(ValueError, match="available player color"):
+        store.join_lobby(code, "Third", player_color="Color 02")

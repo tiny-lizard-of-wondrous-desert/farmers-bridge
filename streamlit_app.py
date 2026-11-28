@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import os
 import sys
 from pathlib import Path
@@ -14,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from cardgame.models import Card, Suit, legal_cards, trick_winner  # noqa: E402
 from cardgame.names import clean_player_name  # noqa: E402
-from cardgame.online import OnlineRoomStore  # noqa: E402
+from cardgame.online import PLAYER_COLORS, OnlineRoomStore  # noqa: E402
 from cardgame.storage import CSVStore  # noqa: E402
 
 st.set_page_config(page_title="Farmer's Bridge Online", layout="wide")
@@ -182,6 +183,10 @@ def render_landing_page():
         st.subheader("Start a new game")
         with st.form("create_room"):
             host_username = st.text_input("Your username")
+            host_color = st.selectbox(
+                "Your player color", list(PLAYER_COLORS),
+                format_func=lambda color: f"{color} ({PLAYER_COLORS[color]})",
+            )
             start_round = st.number_input("Starting hand size", min_value=1, max_value=13, value=1)
             end_round = st.number_input("Maximum hand size", min_value=1, max_value=13, value=7)
             double_max = st.checkbox("Play the maximum hand size twice", value=True)
@@ -202,6 +207,7 @@ def render_landing_page():
                     double_max,
                     player_ids=[host_record["player_id"]],
                     require_pins=require_pins,
+                    player_colors=[host_color],
                 )
                 st.session_state.update(room_code=code, player_name=host_record["name"])
                 if require_pins:
@@ -211,10 +217,29 @@ def render_landing_page():
                 st.error(str(exc))
     else:
         st.subheader("Join an existing lobby")
+        room_input = st.text_input("Room code").strip().upper()
+        room_preview = store.load(room_input) if room_input else None
+        existing_names = {
+            player["name"].casefold() for player in (room_preview or {}).get("players", [])
+        }
+        used_colors = {
+            player.get("color") for player in (room_preview or {}).get("players", [])
+        }
+        available_colors = [color for color in PLAYER_COLORS if color not in used_colors]
         with st.form("join_room"):
-            room_input = st.text_input("Room code").strip().upper()
             name_input = clean_player_name(st.text_input("Username"))
             pin_input = st.text_input("Choose/enter your player PIN (if required)", type="password")
+            if name_input.casefold() in existing_names:
+                st.caption("This username already belongs to a player in the room; their saved color will be retained.")
+                selected_color = None
+            elif available_colors:
+                selected_color = st.selectbox(
+                    "Choose your player color", available_colors,
+                    format_func=lambda color: f"{color} ({PLAYER_COLORS[color]})",
+                )
+            else:
+                selected_color = None
+                st.warning("No player colors remain available in this room.")
             connect = st.form_submit_button("Join lobby", type="primary")
         if connect:
             room = store.load(room_input)
@@ -224,9 +249,11 @@ def render_landing_page():
                     if existing:
                         accepted = store.authenticate(room_input, name_input, pin_input)
                     else:
+                        if not name_input:
+                            raise ValueError("Enter a username.")
                         player_record = data_store.add_player(name_input)
                         accepted = store.join_lobby(
-                            room_input, name_input, pin_input, player_record["player_id"]
+                            room_input, name_input, pin_input, player_record["player_id"], selected_color
                         )
                     if accepted:
                         st.session_state.update(room_code=room_input, player_name=name_input)
@@ -295,8 +322,14 @@ def render_room(code: str, name: str):
         joined_col, waiting_col = st.columns(2)
         with joined_col:
             st.markdown("**Joined**")
-            for player in players:
-                st.text(f"✓ {player}")
+            for player_index, player in enumerate(players):
+                player_color = PLAYER_COLORS.get(
+                    state["players"][player_index].get("color"), "#68717d"
+                )
+                st.markdown(
+                    f'<span style="color:{player_color};font-weight:700">● {html.escape(player)}</span>',
+                    unsafe_allow_html=True,
+                )
         with waiting_col:
             st.markdown("**Waiting to join**")
             if expected is None:
@@ -567,59 +600,110 @@ def render_room(code: str, name: str):
                 st.write(f"**Phase:** {state['status'].replace('_', ' ').title()}")
 
             current_plays = state["trick_plays"]
-            completed_plays = (
-                state["trick_history"][-1]["plays"]
-                if state["trick_history"] and not current_plays
-                else []
+            # Grouped player table: identity | cumulative/bid/tricks | current trick | last trick.
+            st.markdown("### Player table")
+            st.caption(
+                "WILL WIN means the player currently holds the highest card in the trick being played; "
+                "it is not a prediction of their final game result. Markers can appear together."
             )
-            displayed_plays = current_plays or completed_plays
-            plays_by_player = {play["player_index"]: play for play in displayed_plays}
-            winning_index = None
-            if current_plays:
-                winning_index = trick_winner(
+            player_order = [
+                (leader_index + offset) % len(players) for offset in range(len(players))
+            ]
+            current_plays = state["trick_plays"]
+            latest_trick = state["trick_history"][-1] if state["trick_history"] else None
+            current_by_player = {play["player_index"]: play for play in current_plays}
+            last_by_player = (
+                {play["player_index"]: play for play in latest_trick["plays"]}
+                if latest_trick else {}
+            )
+            current_winner = (
+                trick_winner(
                     [
                         (play["player_index"], Card(Suit(play["suit"]), int(play["rank"])))
                         for play in current_plays
                     ],
                     Suit(state["trump_suit"]),
                 )
-            elif completed_plays:
-                winning_index = next(
-                    play["player_index"]
-                    for play in completed_plays
-                    if play["player"] == state["trick_history"][-1]["winner"]
-                )
+                if current_plays else None
+            )
+            last_leader = latest_trick["plays"][0]["player_index"] if latest_trick else None
+            last_winner = next(
+                (play["player_index"] for play in latest_trick["plays"]
+                 if play["player"] == latest_trick["winner"]), None
+            ) if latest_trick else None
 
-            st.markdown("### Bids called vs. tricks won")
-            st.caption("Players are ordered from the current trick leader, then in play order.")
-            player_order = [
-                (leader_index + offset) % len(players) for offset in range(len(players))
+            def suit_color(card_play):
+                return "#c62828" if card_play["suit"] in ("Hearts", "Diamonds") else "#202020"
+
+            def played_card(card_play):
+                if not card_play:
+                    return "—"
+                return card_label(Card(Suit(card_play["suit"]), int(card_play["rank"])))
+
+            headers = [
+                ("Player", 1), ("Cumulative score", 1), ("Bid called", 1),
+                ("Tricks won", 1), ("Current card", 1), ("Current markers", 1),
+                ("Last trick card", 1), ("Last trick markers", 1),
             ]
-            table_rows = []
+            html_rows = [
+                '<div style="width:100%;overflow-x:auto">',
+                '<table style="width:100%;min-width:850px;border-collapse:collapse;font-size:0.92rem">',
+                '<thead><tr style="background:var(--secondary-background-color)">',
+                '<th colspan="1" style="padding:9px;text-align:left;border-bottom:3px solid var(--text-color)">1 · Player</th>',
+                '<th colspan="3" style="padding:9px;text-align:center;border-left:3px solid var(--text-color);border-bottom:3px solid var(--text-color)">2 · Cumulative score + Bid + Tricks</th>',
+                '<th colspan="2" style="padding:9px;text-align:center;border-left:3px solid var(--text-color);border-bottom:3px solid var(--text-color)">3 · Current card played + Current markers</th>',
+                '<th colspan="2" style="padding:9px;text-align:center;border-left:3px solid var(--text-color);border-bottom:3px solid var(--text-color)">4 · Last trick card + markers</th>',
+                '</tr><tr>'
+            ]
+            for col_index, (heading, _) in enumerate(headers):
+                separator = "border-left:3px solid var(--text-color);" if col_index in (1, 4, 6) else ""
+                html_rows.append(f'<th style="padding:7px;text-align:left;border-bottom:1px solid #888;{separator}">{heading}</th>')
+            html_rows.append("</tr></thead><tbody>")
             for index in player_order:
                 player = players[index]
-                played = plays_by_player.get(index)
-                markers = []
+                player_record = state["players"][index]
+                color = PLAYER_COLORS.get(player_record.get("color"), "#68717d")
+                current_play = current_by_player.get(index)
+                last_play = last_by_player.get(index)
+                current_markers = []
                 if index == leader_index:
-                    markers.append("LEAD")
+                    current_markers.append("LEAD")
                 if index == active_index:
-                    markers.append("▶ TURN")
-                if index == winning_index:
-                    markers.append("★ WINNING")
-                table_rows.append(
-                    {
-                        "Player": player,
-                        "Marker": " · ".join(markers),
-                        "Bid called": state["bids"].get(player, "—"),
-                        "Tricks won": state["tricks"].get(player, 0),
-                        "Card played": (
-                            card_label(Card(Suit(played["suit"]), int(played["rank"])))
-                            if played else "—"
-                        ),
-                        "Cumulative score": state["scores"].get(player, 0),
-                    }
-                )
-            st.table(table_rows)
+                    current_markers.append("TURN")
+                if index == current_winner:
+                    current_markers.append("WILL WIN")
+                last_markers = []
+                if index == last_leader:
+                    last_markers.append("LED")
+                if index == last_winner:
+                    last_markers.append("WON")
+                values = [
+                    f'<span style="font-weight:700;color:{color}">{html.escape(player)}</span>',
+                    str(state["scores"].get(player, 0)),
+                    str(state["bids"].get(player, "—")),
+                    str(state["tricks"].get(player, 0)),
+                    f'<span style="font-weight:700;color:{suit_color(current_play) if current_play else "inherit"}">{played_card(current_play)}</span>',
+                    " · ".join(current_markers) or "—",
+                    f'<span style="font-weight:700;color:{suit_color(last_play) if last_play else "inherit"}">{played_card(last_play)}</span>',
+                    " · ".join(last_markers) or "—",
+                ]
+                html_rows.append("<tr>")
+                for col_index, value in enumerate(values):
+                    separator = "border-left:3px solid var(--text-color);" if col_index in (1, 4, 6) else ""
+                    html_rows.append(f'<td style="padding:8px;border-bottom:1px solid #9995;{separator}">{value}</td>')
+                html_rows.append("</tr>")
+            html_rows.append("</tbody></table></div>")
+            st.markdown("".join(html_rows), unsafe_allow_html=True)
+
+            if state["status"] != "bidding":
+                bid_total = sum(int(value) for value in state["bids"].values())
+                difference = bid_total - round_no
+                if difference > 0:
+                    st.info(f"Overcalled by {difference}: bids total {bid_total}, but only {round_no} trick(s) are available.")
+                elif difference < 0:
+                    st.info(f"Undercalled by {abs(difference)}: bids total {bid_total}, but {round_no} trick(s) are available.")
+                else:
+                    st.info(f"Exactly called: fix bidding???")
 
             if current_plays:
                 st.caption("Previous trick remains available while this trick is in progress.")
