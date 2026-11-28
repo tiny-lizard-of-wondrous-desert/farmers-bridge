@@ -10,7 +10,6 @@ A Python implementation of Farmer's Bridge with a shared game engine and three i
 Implemented in the online Streamlit interface:
 
 - [x] "Trick complete" popup formats J/Q/K/A as letters and uses compact rank/suit notation.
-- [x] Only the host can correct bids during the explicit bid-review phase. The host selects the player, makes a correction, and can repeat the review before confirming all bids.
 - [x] Players click an enabled card in their hand to play it. Illegal cards are disabled; the dropdown has been removed.
 - [x] Current-trick cards are shown in the same player table as bids and tricks.
 - [x] Trump is displayed as a card face or compact rank/suit label.
@@ -18,10 +17,6 @@ Implemented in the online Streamlit interface:
 - [x] Round-by-round scores show each player's bid, tricks won, points earned and cumulative score.
 - [x] A card-face preference checkbox controls the hand display; narrow panels automatically use compact notation.
 - [x] The game mat uses four visually separated player-table groups: Player; Cumulative score/Bid/Tricks; Current card/markers; Last-trick card/markers.
-- [x] Current markers can appear together: LEAD, TURN and WILL WIN. WILL WIN identifies the current highest card in the in-progress trick, not a forecast of the game result.
-- [x] The last-trick group identifies the card played, who led (LED) and who won (WON); it does not show a turn marker.
-- [x] Once all bids are submitted, the game mat reports whether the round is overcalled or undercalled.
-- [x] Players choose a color when creating/joining a room. Colors are unique within a room, stored with the player, and used consistently in the lobby and player table.
 
 ### Next
 
