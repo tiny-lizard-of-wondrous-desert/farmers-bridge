@@ -99,8 +99,8 @@ def render_hand_cards(
         suit = suit_symbols[card.suit.value]
         tiles.append(
             f'<div style="width:66px;height:94px;flex:0 0 66px;border:1px solid #b8b8b8;'
-            f'border-radius:7px;background:#fff;color:{color};padding:6px 7px;'
-            f'box-sizing:border-box;box-shadow:0 1px 3px #0002;display:flex;'
+            f"border-radius:7px;background:#fff;color:{color};padding:6px 7px;"
+            f"box-sizing:border-box;box-shadow:0 1px 3px #0002;display:flex;"
             f'flex-direction:column;justify-content:space-between;font-family:Arial,sans-serif">'
             f'<div style="font-size:21px;font-weight:700;line-height:1">{rank}</div>'
             f'<div style="font-size:37px;text-align:center;line-height:1">{suit}</div>'
@@ -108,11 +108,11 @@ def render_hand_cards(
         )
     st.markdown(
         '<div style="display:flex;flex-wrap:wrap;gap:7px;align-items:flex-start">'
-        + "".join(tiles) + "</div>",
+        + "".join(tiles)
+        + "</div>",
         unsafe_allow_html=True,
     )
     return None
-
 
 
 # Optional private-repository backup settings are stored in Streamlit Secrets.
@@ -148,25 +148,29 @@ def show_scores(scores: dict, dealer: str, round_results: list[dict]):
         with st.expander("Round-by-round scores", expanded=True):
             for result in round_results:
                 st.markdown(f"**Round {result['round']}**")
-                st.table([
-                    {
-                        "Player": player,
-                        "Bid": result["bids"][player],
-                        "Tricks": result["tricks"][player],
-                        "Round score": result["points"][player],
-                        "Total score": result["scores"][player],
-                    }
-                    for player in scores
-                ])
+                st.table(
+                    [
+                        {
+                            "Player": player,
+                            "Bid": result["bids"][player],
+                            "Tricks": result["tricks"][player],
+                            "Round score": result["points"][player],
+                            "Total score": result["scores"][player],
+                        }
+                        for player in scores
+                    ]
+                )
 
 
 @st.dialog("Trick complete")
 def show_trick_winner(winner: str, plays: list[dict]):
     st.success(f"{winner} won the trick!")
-    st.write(" · ".join(
-        f"{play['player']}: {card_label(Card(Suit(play['suit']), int(play['rank'])))}"
-        for play in plays
-    ))
+    st.write(
+        " · ".join(
+            f"{play['player']}: {card_label(Card(Suit(play['suit']), int(play['rank'])))}"
+            for play in plays
+        )
+    )
     if st.button("Continue"):
         st.rerun()
 
@@ -184,7 +188,8 @@ def render_landing_page():
         with st.form("create_room"):
             host_username = st.text_input("Your username")
             host_color = st.selectbox(
-                "Your player color", list(PLAYER_COLORS),
+                "Your player color",
+                list(PLAYER_COLORS),
                 format_func=lambda color: f"{color} ({PLAYER_COLORS[color]})",
             )
             start_round = st.number_input("Starting hand size", min_value=1, max_value=13, value=1)
@@ -198,7 +203,9 @@ def render_landing_page():
                     raise ValueError("Enter your username.")
                 host_name = clean_player_name(host_username)
                 if not host_name:
-                    raise ValueError("Your username must contain at least one letter, number or symbol.")
+                    raise ValueError(
+                        "Your username must contain at least one letter, number or symbol."
+                    )
                 host_record = data_store.add_player(host_name)
                 code, credentials = store.create_room(
                     [host_record["name"]],
@@ -222,19 +229,20 @@ def render_landing_page():
         existing_names = {
             player["name"].casefold() for player in (room_preview or {}).get("players", [])
         }
-        used_colors = {
-            player.get("color") for player in (room_preview or {}).get("players", [])
-        }
+        used_colors = {player.get("color") for player in (room_preview or {}).get("players", [])}
         available_colors = [color for color in PLAYER_COLORS if color not in used_colors]
         with st.form("join_room"):
             name_input = clean_player_name(st.text_input("Username"))
             pin_input = st.text_input("Choose/enter your player PIN (if required)", type="password")
             if name_input.casefold() in existing_names:
-                st.caption("This username already belongs to a player in the room; their saved color will be retained.")
+                st.caption(
+                    "This username already belongs to a player in the room; their saved color will be retained."
+                )
                 selected_color = None
             elif available_colors:
                 selected_color = st.selectbox(
-                    "Choose your player color", available_colors,
+                    "Choose your player color",
+                    available_colors,
                     format_func=lambda color: f"{color} ({PLAYER_COLORS[color]})",
                 )
             else:
@@ -244,7 +252,9 @@ def render_landing_page():
         if connect:
             room = store.load(room_input)
             if room and room.get("status") == "lobby":
-                existing = any(p["name"].casefold() == name_input.casefold() for p in room["players"])
+                existing = any(
+                    p["name"].casefold() == name_input.casefold() for p in room["players"]
+                )
                 try:
                     if existing:
                         accepted = store.authenticate(room_input, name_input, pin_input)
@@ -253,7 +263,11 @@ def render_landing_page():
                             raise ValueError("Enter a username.")
                         player_record = data_store.add_player(name_input)
                         accepted = store.join_lobby(
-                            room_input, name_input, pin_input, player_record["player_id"], selected_color
+                            room_input,
+                            name_input,
+                            pin_input,
+                            player_record["player_id"],
+                            selected_color,
                         )
                     if accepted:
                         st.session_state.update(room_code=room_input, player_name=name_input)
@@ -338,7 +352,9 @@ def render_room(code: str, name: str):
                 for seat in range(expected - joined):
                     st.write(f"Waiting for player {joined + seat + 1}")
         if is_host:
-            st.caption("Share the room code. Any number of players can join, subject to the 52-card deck limit. Start when at least two have joined.")
+            st.caption(
+                "Share the room code. Any number of players can join, subject to the 52-card deck limit. Start when at least two have joined."
+            )
             ready = joined >= 2 and (expected is None or joined == expected)
             if st.button("Start game", type="primary", disabled=not ready):
                 try:
@@ -433,9 +449,7 @@ def render_room(code: str, name: str):
         turn_summary = f"Current turn: {players[state['current_turn']]}"
     else:
         turn_summary = f"Phase: {state['status'].replace('_', ' ').title()}"
-    score_summary = " · ".join(
-        f"{player}: {state['scores'].get(player, 0)}" for player in players
-    )
+    score_summary = " · ".join(f"{player}: {state['scores'].get(player, 0)}" for player in players)
     st.caption(f"{turn_summary}  |  Scores — {score_summary}")
 
     player_index = players.index(name)
@@ -457,7 +471,10 @@ def render_room(code: str, name: str):
                 "round_review",
             }:
                 hand_cards = sorted(
-                    [Card(Suit(suit), int(rank)) for suit, rank in state["hands"][str(player_index)]],
+                    [
+                        Card(Suit(suit), int(rank))
+                        for suit, rank in state["hands"][str(player_index)]
+                    ],
                     key=lambda card: (list(Suit).index(card.suit), card.rank),
                 )
                 st.markdown("**Cards in your hand**")
@@ -525,9 +542,7 @@ def render_room(code: str, name: str):
                         )
                         if st.button("Save authorized bid correction"):
                             try:
-                                store.correct_bid(
-                                    code, name, correction_player, int(revised_bid)
-                                )
+                                store.correct_bid(code, name, correction_player, int(revised_bid))
                                 st.rerun()
                             except ValueError as exc:
                                 st.error(str(exc))
@@ -614,7 +629,8 @@ def render_room(code: str, name: str):
             current_by_player = {play["player_index"]: play for play in current_plays}
             last_by_player = (
                 {play["player_index"]: play for play in latest_trick["plays"]}
-                if latest_trick else {}
+                if latest_trick
+                else {}
             )
             current_winner = (
                 trick_winner(
@@ -624,13 +640,22 @@ def render_room(code: str, name: str):
                     ],
                     Suit(state["trump_suit"]),
                 )
-                if current_plays else None
+                if current_plays
+                else None
             )
             last_leader = latest_trick["plays"][0]["player_index"] if latest_trick else None
-            last_winner = next(
-                (play["player_index"] for play in latest_trick["plays"]
-                 if play["player"] == latest_trick["winner"]), None
-            ) if latest_trick else None
+            last_winner = (
+                next(
+                    (
+                        play["player_index"]
+                        for play in latest_trick["plays"]
+                        if play["player"] == latest_trick["winner"]
+                    ),
+                    None,
+                )
+                if latest_trick
+                else None
+            )
 
             def suit_color(card_play):
                 return "#c62828" if card_play["suit"] in ("Hearts", "Diamonds") else "#202020"
@@ -641,9 +666,14 @@ def render_room(code: str, name: str):
                 return card_label(Card(Suit(card_play["suit"]), int(card_play["rank"])))
 
             headers = [
-                ("Player", 1), ("Cumulative score", 1), ("Bid called", 1),
-                ("Tricks won", 1), ("Current card", 1), ("Current markers", 1),
-                ("Last trick card", 1), ("Last trick markers", 1),
+                ("Player", 1),
+                ("Cumulative score", 1),
+                ("Bid called", 1),
+                ("Tricks won", 1),
+                ("Current card", 1),
+                ("Current markers", 1),
+                ("Last trick card", 1),
+                ("Last trick markers", 1),
             ]
             html_rows = [
                 '<div style="width:100%;overflow-x:auto">',
@@ -653,11 +683,15 @@ def render_room(code: str, name: str):
                 '<th colspan="3" style="padding:9px;text-align:center;border-left:3px solid var(--text-color);border-bottom:3px solid var(--text-color)">2 · Cumulative score + Bid + Tricks</th>',
                 '<th colspan="2" style="padding:9px;text-align:center;border-left:3px solid var(--text-color);border-bottom:3px solid var(--text-color)">3 · Current card played + Current markers</th>',
                 '<th colspan="2" style="padding:9px;text-align:center;border-left:3px solid var(--text-color);border-bottom:3px solid var(--text-color)">4 · Last trick card + markers</th>',
-                '</tr><tr>'
+                "</tr><tr>",
             ]
             for col_index, (heading, _) in enumerate(headers):
-                separator = "border-left:3px solid var(--text-color);" if col_index in (1, 4, 6) else ""
-                html_rows.append(f'<th style="padding:7px;text-align:left;border-bottom:1px solid #888;{separator}">{heading}</th>')
+                separator = (
+                    "border-left:3px solid var(--text-color);" if col_index in (1, 4, 6) else ""
+                )
+                html_rows.append(
+                    f'<th style="padding:7px;text-align:left;border-bottom:1px solid #888;{separator}">{heading}</th>'
+                )
             html_rows.append("</tr></thead><tbody>")
             for index in player_order:
                 player = players[index]
@@ -689,8 +723,12 @@ def render_room(code: str, name: str):
                 ]
                 html_rows.append("<tr>")
                 for col_index, value in enumerate(values):
-                    separator = "border-left:3px solid var(--text-color);" if col_index in (1, 4, 6) else ""
-                    html_rows.append(f'<td style="padding:8px;border-bottom:1px solid #9995;{separator}">{value}</td>')
+                    separator = (
+                        "border-left:3px solid var(--text-color);" if col_index in (1, 4, 6) else ""
+                    )
+                    html_rows.append(
+                        f'<td style="padding:8px;border-bottom:1px solid #9995;{separator}">{value}</td>'
+                    )
                 html_rows.append("</tr>")
             html_rows.append("</tbody></table></div>")
             st.markdown("".join(html_rows), unsafe_allow_html=True)
@@ -699,9 +737,13 @@ def render_room(code: str, name: str):
                 bid_total = sum(int(value) for value in state["bids"].values())
                 difference = bid_total - round_no
                 if difference > 0:
-                    st.info(f"Overcalled by {difference}: bids total {bid_total}, but only {round_no} trick(s) are available.")
+                    st.info(
+                        f"Overcalled by {difference}: bids total {bid_total}, but only {round_no} trick(s) are available."
+                    )
                 elif difference < 0:
-                    st.info(f"Undercalled by {abs(difference)}: bids total {bid_total}, but {round_no} trick(s) are available.")
+                    st.info(
+                        f"Undercalled by {abs(difference)}: bids total {bid_total}, but {round_no} trick(s) are available."
+                    )
                 else:
                     st.info(f"Exactly called: fix bidding???")
 

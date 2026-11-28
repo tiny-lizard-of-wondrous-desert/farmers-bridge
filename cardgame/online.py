@@ -23,7 +23,8 @@ from .names import clean_player_name
 from .storage import CSVStore
 
 PLAYER_COLORS = {
-    f"Color {index + 1:02d}": "#" + "".join(
+    f"Color {index + 1:02d}": "#"
+    + "".join(
         f"{round(channel * 255):02x}"
         for channel in colorsys.hsv_to_rgb((index * 0.61803398875) % 1, 0.68, 0.78)
     )
@@ -95,8 +96,12 @@ class OnlineRoomStore:
         credentials = {
             name: f"{secrets.randbelow(1_000_000):06d}" if require_pins else "" for name in clean
         }
-        selected_colors = player_colors or [list(PLAYER_COLORS)[i % len(PLAYER_COLORS)] for i in range(len(clean))]
-        if len(selected_colors) != len(clean) or any(color not in PLAYER_COLORS for color in selected_colors):
+        selected_colors = player_colors or [
+            list(PLAYER_COLORS)[i % len(PLAYER_COLORS)] for i in range(len(clean))
+        ]
+        if len(selected_colors) != len(clean) or any(
+            color not in PLAYER_COLORS for color in selected_colors
+        ):
             raise ValueError("Choose a valid color for every player.")
         if len(set(selected_colors)) != len(selected_colors):
             raise ValueError("Every player must have a unique color.")
@@ -173,7 +178,11 @@ class OnlineRoomStore:
             logging.exception("Private online room backup sync failed")
 
     def join_lobby(
-        self, code: str, player_name: str, pin: str = "", player_id: str | None = None,
+        self,
+        code: str,
+        player_name: str,
+        pin: str = "",
+        player_id: str | None = None,
         player_color: str | None = None,
     ) -> bool:
         """Register a player's own username in an open lobby."""
@@ -199,15 +208,17 @@ class OnlineRoomStore:
             if selected_color not in PLAYER_COLORS or selected_color in used_colors:
                 raise ValueError("Choose an available player color.")
             salt = secrets.token_hex(16)
-            state["players"].append({
-                "name": clean,
-                "color": selected_color,
-                "player_id": player_id or uuid4().hex[:12],
-                "pin_enabled": state.get("require_pins", True),
-                "joined": True,
-                "pin_salt": salt,
-                "pin_hash": self._hash(pin, salt) if state.get("require_pins", True) else "",
-            })
+            state["players"].append(
+                {
+                    "name": clean,
+                    "color": selected_color,
+                    "player_id": player_id or uuid4().hex[:12],
+                    "pin_enabled": state.get("require_pins", True),
+                    "joined": True,
+                    "pin_salt": salt,
+                    "pin_hash": self._hash(pin, salt) if state.get("require_pins", True) else "",
+                }
+            )
             state["scores"][clean] = 0
 
         self._mutate(code, mutation)

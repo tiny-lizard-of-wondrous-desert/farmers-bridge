@@ -2,6 +2,7 @@ import pytest
 
 from cardgame.online import OnlineRoomStore, PLAYER_COLORS
 
+
 def test_online_room_full_one_trick_game(tmp_path):
     store = OnlineRoomStore(tmp_path / "rooms.sqlite3")
     code, pins = store.create_room(["Ada", "Bea"], 1, 1, False)
@@ -73,21 +74,16 @@ def test_optional_player_pins_and_stable_ids(tmp_path):
     assert store.load(code)["players"][0]["player_id"] == ids[0]
 
 
-
 def test_lobby_players_join_with_own_usernames_and_host_waits(tmp_path):
     store = OnlineRoomStore(tmp_path / "joining.sqlite3")
-    code, _ = store.create_room(
-        ["Host"], 1, 1, False, require_pins=False, expected_players=3
-    )
+    code, _ = store.create_room(["Host"], 1, 1, False, require_pins=False, expected_players=3)
     assert store.load(code)["expected_players"] == 3
     with pytest.raises(ValueError, match="Waiting for all player seats"):
         store.start_game(code, "Host")
     assert store.join_lobby(code, "Player Two")
     assert store.join_lobby(code, "Player Three")
     state = store.load(code)
-    assert [player["name"] for player in state["players"]] == [
-        "Host", "Player Two", "Player Three"
-    ]
+    assert [player["name"] for player in state["players"]] == ["Host", "Player Two", "Player Three"]
     assert all(player["joined"] for player in state["players"])
     store.start_game(code, "Host")
     assert store.load(code)["status"] == "bidding"
@@ -95,15 +91,12 @@ def test_lobby_players_join_with_own_usernames_and_host_waits(tmp_path):
 
 def test_lobby_rejects_duplicate_or_excess_players(tmp_path):
     store = OnlineRoomStore(tmp_path / "joining-limits.sqlite3")
-    code, _ = store.create_room(
-        ["Host"], 1, 1, False, require_pins=False, expected_players=2
-    )
+    code, _ = store.create_room(["Host"], 1, 1, False, require_pins=False, expected_players=2)
     with pytest.raises(ValueError, match="already in this lobby"):
         store.join_lobby(code, "host")
     store.join_lobby(code, "Guest")
     with pytest.raises(ValueError, match="lobby is full"):
         store.join_lobby(code, "Late")
-
 
 
 def test_lobby_joiner_sets_private_pin(tmp_path):
@@ -172,7 +165,11 @@ def test_player_colors_reject_duplicates_and_unavailable_colors(tmp_path):
     store = OnlineRoomStore(tmp_path / "duplicate-colors.sqlite3")
     with pytest.raises(ValueError, match="unique color"):
         store.create_room(
-            ["Host", "Guest"], 1, 1, False, require_pins=False,
+            ["Host", "Guest"],
+            1,
+            1,
+            False,
+            require_pins=False,
             player_colors=["Color 01", "Color 01"],
         )
     code, _ = store.create_room(["Host"], 1, 1, False, require_pins=False)
