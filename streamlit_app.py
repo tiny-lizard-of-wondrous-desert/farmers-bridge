@@ -745,7 +745,7 @@ def render_room(code: str, name: str):
                         f"Undercalled by {abs(difference)}: bids total {bid_total}, but {round_no} trick(s) are available."
                     )
                 else:
-                    st.info(f"Exactly called: fix bidding???")
+                    st.info("Exactly called: fix bidding???")
 
             if current_plays:
                 st.caption("Previous trick remains available while this trick is in progress.")
@@ -756,7 +756,7 @@ def render_room(code: str, name: str):
                         for play in previous["plays"]
                     )
                     st.info(f"Previous trick — {previous_cards} — {previous['winner']} won")
-            elif not completed_plays:
+            else:
                 st.caption("No cards played in this trick yet.")
 
             if state["trick_history"]:

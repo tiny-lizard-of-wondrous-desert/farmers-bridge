@@ -1,6 +1,6 @@
 import pytest
 
-from cardgame.online import OnlineRoomStore, PLAYER_COLORS
+from cardgame.online import PLAYER_COLORS, OnlineRoomStore
 
 
 def test_online_room_full_one_trick_game(tmp_path):
