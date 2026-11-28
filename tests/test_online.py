@@ -16,7 +16,9 @@ def test_online_room_full_one_trick_game(tmp_path):
     store.submit_bid(code, "Bea", 0)
     store.submit_bid(code, "Ada", 0)
     assert store.load(code)["status"] == "bids_review"
-    store.correct_bid(code, "Bea", 0)
+    with pytest.raises(ValueError, match="Only the host"):
+        store.correct_bid(code, "Bea", "Bea", 0)
+    store.correct_bid(code, "Ada", "Bea", 0)
     store.confirm_bids(code, "Ada")
     assert store.load(code)["status"] == "playing"
     # Play the current player's first card, then the next player's.

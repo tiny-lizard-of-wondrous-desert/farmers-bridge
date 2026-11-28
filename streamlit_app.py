@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from cardgame.models import Card, Suit, legal_cards  # noqa: E402
+from cardgame.models import Card, Suit, legal_cards, trick_winner  # noqa: E402
 from cardgame.names import clean_player_name  # noqa: E402
 from cardgame.online import OnlineRoomStore  # noqa: E402
 from cardgame.storage import CSVStore  # noqa: E402
@@ -32,11 +32,63 @@ def card_label(card: Card) -> str:
     return f"{rank}{suit}"
 
 
-def render_hand_cards(cards: list[Card], compact: bool = False) -> None:
-    """Show card-face artwork when there is room; use compact labels in narrow panels."""
+def render_hand_cards(
+    cards: list[Card],
+    compact: bool = False,
+    clickable: bool = False,
+    allowed_cards: list[Card] | None = None,
+    key_prefix: str = "hand",
+) -> Card | None:
+    """Render card buttons; use compact notation when space is limited."""
+    if not cards:
+        st.caption("No cards remaining.")
+        return None
+    allowed = set(allowed_cards or [])
+    if clickable:
+        st.markdown(
+            """
+            <style>
+            div[class*="st-key-play_card"] button {
+                min-height: 76px;
+                border: 1px solid #9a9a9a;
+                border-radius: 9px;
+                background: #fff;
+                color: #202020;
+                font-size: 1.15rem;
+                font-weight: 650;
+                white-space: pre-line;
+                box-shadow: 0 1px 3px #0002;
+            }
+            div[class*="st-key-play_card"] button:disabled { opacity: .38; }
+            @media (max-width: 640px) {
+                div[class*="st-key-play_card"] button {
+                    min-height: 54px;
+                    font-size: .95rem;
+                }
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        columns = st.columns(min(len(cards), 6 if compact else 5))
+        for index, card in enumerate(cards):
+            rank = {11: "J", 12: "Q", 13: "K", 14: "A"}.get(card.rank, str(card.rank))
+            suit = {"Clubs": "♣", "Diamonds": "♦", "Hearts": "♥", "Spades": "♠"}[card.suit.value]
+            label = f"{rank}{suit}" if compact else f"{rank}\\n{suit}"
+            with columns[index % len(columns)]:
+                if st.button(
+                    label,
+                    key=f"{key_prefix}_{index}_{card.suit.value}_{card.rank}",
+                    disabled=card not in allowed,
+                    use_container_width=True,
+                ):
+                    return card
+        return None
+
     if compact:
-        st.write("　".join(card_label(card) for card in cards) if cards else "No cards remaining.")
-        return
+        st.write("　".join(card_label(card) for card in cards))
+        return None
+
     suit_symbols = {"Clubs": "♣", "Diamonds": "♦", "Hearts": "♥", "Spades": "♠"}
     tiles = []
     for card in cards:
@@ -58,7 +110,7 @@ def render_hand_cards(cards: list[Card], compact: bool = False) -> None:
         + "".join(tiles) + "</div>",
         unsafe_allow_html=True,
     )
-
+    return None
 
 
 
@@ -92,16 +144,27 @@ def show_scores(scores: dict, dealer: str, round_results: list[dict]):
     )
     st.caption(f"Dealer: {dealer}")
     if round_results:
-        with st.expander("Round-by-round scores"):
+        with st.expander("Round-by-round scores", expanded=True):
             for result in round_results:
-                st.write(f"Round {result['round']} ({result['round']} cards): {result['scores']}")
+                st.markdown(f"**Round {result['round']}**")
+                st.table([
+                    {
+                        "Player": player,
+                        "Bid": result["bids"][player],
+                        "Tricks": result["tricks"][player],
+                        "Round score": result["points"][player],
+                        "Total score": result["scores"][player],
+                    }
+                    for player in scores
+                ])
 
 
 @st.dialog("Trick complete")
 def show_trick_winner(winner: str, plays: list[dict]):
     st.success(f"{winner} won the trick!")
     st.write(" · ".join(
-        f"{play['player']}: {play['rank']} {play['suit']}" for play in plays
+        f"{play['player']}: {card_label(Card(Suit(play['suit']), int(play['rank'])))}"
+        for play in plays
     ))
     if st.button("Continue"):
         st.rerun()
@@ -175,6 +238,15 @@ def render_landing_page():
                 st.rerun()
             else:
                 st.error("Room, username or PIN is incorrect, or the lobby is full.")
+
+
+def is_mobile_client() -> bool:
+    """Use the browser user-agent to choose a phone-friendly single-panel layout."""
+    try:
+        user_agent = st.context.headers.get("User-Agent", "").lower()
+    except Exception:
+        return False
+    return any(token in user_agent for token in ("iphone", "android", "mobile", "ipod"))
 
 
 def render_room(code: str, name: str):
@@ -276,19 +348,30 @@ def render_room(code: str, name: str):
     round_no = state["round_sequence"][state["round_index"]]
     up_rounds = state["end_round"] - state["start_round"] + 1
     direction = "UP" if state["round_index"] < up_rounds else "DOWN"
-    st.subheader(
-        f"Round {state['round_index'] + 1} of {len(state['round_sequence'])} "
-        f"— {round_no} card(s) per player — {direction}"
-    )
-
     toolbar_left, toolbar_right = st.columns([3, 1])
+    mobile_client = is_mobile_client()
     with toolbar_left:
-        panel_mode = st.radio(
-            "View",
-            ["Split screen", "Hand full panel", "Game mat full panel"],
-            horizontal=True,
-            key="panel_mode",
-            label_visibility="collapsed",
+        if mobile_client:
+            mobile_view = st.radio(
+                "View",
+                ["Hand", "Game Mat"],
+                horizontal=True,
+                key="mobile_panel_mode",
+                label_visibility="collapsed",
+            )
+            panel_mode = "Hand full panel" if mobile_view == "Hand" else "Game mat full panel"
+        else:
+            panel_mode = st.radio(
+                "View",
+                ["Split screen", "Hand full panel", "Game mat full panel"],
+                horizontal=True,
+                key="panel_mode",
+                label_visibility="collapsed",
+            )
+        show_card_faces = st.checkbox(
+            "Show card faces when space allows",
+            value=True,
+            key="show_card_faces",
         )
     with toolbar_right:
         if st.button("Current scores", use_container_width=True):
@@ -305,6 +388,22 @@ def render_room(code: str, name: str):
             help="Choose how much horizontal space each panel receives.",
             key="panel_ratio",
         )
+
+    st.subheader(
+        f"Round {state['round_index'] + 1} of {len(state['round_sequence'])} "
+        f"— {round_no} card(s) per player — {direction}"
+    )
+    if state["status"] == "bidding":
+        next_player = players[state["bid_order"][state["bid_turn"]]]
+        turn_summary = f"Next bid: {next_player}"
+    elif state["status"] == "playing":
+        turn_summary = f"Current turn: {players[state['current_turn']]}"
+    else:
+        turn_summary = f"Phase: {state['status'].replace('_', ' ').title()}"
+    score_summary = " · ".join(
+        f"{player}: {state['scores'].get(player, 0)}" for player in players
+    )
+    st.caption(f"{turn_summary}  |  Scores — {score_summary}")
 
     player_index = players.index(name)
     hand_col, mat_col = (None, None)
@@ -329,7 +428,31 @@ def render_room(code: str, name: str):
                     key=lambda card: (list(Suit).index(card.suit), card.rank),
                 )
                 st.markdown("**Cards in your hand**")
-                render_hand_cards(hand_cards, compact=(panel_mode == "Split screen" and ratio < 45))
+                narrow_panel = panel_mode == "Split screen" and ratio < 45
+                compact_hand = not show_card_faces or narrow_panel
+                can_play = state["status"] == "playing" and state["current_turn"] == player_index
+                if can_play:
+                    led_suit = (
+                        Suit(state["trick_plays"][0]["suit"]) if state["trick_plays"] else None
+                    )
+                    allowed = legal_cards(hand_cards, led_suit)
+                    selected_card = render_hand_cards(
+                        hand_cards,
+                        compact=compact_hand,
+                        clickable=True,
+                        allowed_cards=allowed,
+                        key_prefix="play_card",
+                    )
+                    if selected_card is not None:
+                        try:
+                            store.play_card(
+                                code, name, selected_card.suit.value, selected_card.rank
+                            )
+                            st.rerun()
+                        except ValueError as exc:
+                            st.error(str(exc))
+                else:
+                    render_hand_cards(hand_cards, compact=compact_hand)
             if state["status"] == "bidding":
                 bid_index = state["bid_order"][state["bid_turn"]]
                 current_bidder = players[bid_index]
@@ -350,47 +473,44 @@ def render_room(code: str, name: str):
                 else:
                     st.info(f"Waiting for {current_bidder} to bid.")
             elif state["status"] == "bids_review":
-                st.write(f"Your current bid: **{state['bids'].get(name, '—')}**")
-                current_bid = state["bids"][name]
-                revised_bid = st.number_input(
-                    "Change your bid if needed",
-                    min_value=0,
-                    max_value=round_no,
-                    value=int(current_bid),
-                    step=1,
-                    key=f"review_bid_{state['round_index']}_{name}",
-                )
-                if st.button("Save my bid correction"):
-                    try:
-                        store.correct_bid(code, name, int(revised_bid))
-                        st.rerun()
-                    except ValueError as exc:
-                        st.error(str(exc))
-                if is_host and st.button("All bids good — start playing", type="primary"):
-                    try:
-                        store.confirm_bids(code, name)
-                        st.rerun()
-                    except ValueError as exc:
-                        st.error(str(exc))
-            elif state["status"] == "playing":
-                hand = [
-                    Card(Suit(suit), int(rank)) for suit, rank in state["hands"][str(player_index)]
-                ]
-                rank_names = {11: "J", 12: "Q", 13: "K", 14: "A"}
-                if state["current_turn"] == player_index:
-                    led = Suit(state["trick_plays"][0]["suit"]) if state["trick_plays"] else None
-                    allowed = legal_cards(hand, led)
-                    labels = {card_label(card): card for card in allowed}
-                    selected = st.selectbox("Choose a legal card", list(labels))
-                    if st.button("Play card", type="primary"):
-                        card = labels[selected]
+                st.info("Bids are locked for review. Only the host can authorize corrections.")
+                if is_host:
+                    st.write("**Review all bids before card play begins.**")
+                    correction_player = st.selectbox(
+                        "Select a player whose bid needs correcting",
+                        ["No correction"] + players,
+                        key=f"bid_correction_player_{state['round_index']}",
+                    )
+                    if correction_player != "No correction":
+                        revised_bid = st.number_input(
+                            f"{correction_player}'s corrected bid",
+                            min_value=0,
+                            max_value=round_no,
+                            value=int(state["bids"][correction_player]),
+                            step=1,
+                            key=f"review_bid_{state['round_index']}_{correction_player}",
+                        )
+                        if st.button("Save authorized bid correction"):
+                            try:
+                                store.correct_bid(
+                                    code, name, correction_player, int(revised_bid)
+                                )
+                                st.rerun()
+                            except ValueError as exc:
+                                st.error(str(exc))
+                    if st.button("All bids good — start playing", type="primary"):
                         try:
-                            store.play_card(code, name, card.suit.value, card.rank)
+                            store.confirm_bids(code, name)
                             st.rerun()
                         except ValueError as exc:
                             st.error(str(exc))
                 else:
+                    st.info("Waiting for the host to confirm the bids or request a correction.")
+            elif state["status"] == "playing":
+                if state["current_turn"] != player_index:
                     st.info(f"Waiting for {players[state['current_turn']]} to play.")
+                else:
+                    st.caption("Select one of the enabled cards above to play it.")
             elif state["status"] == "round_review":
                 st.info("All cards have been played. The host reviews the trick totals.")
                 if is_host:
@@ -428,42 +548,93 @@ def render_room(code: str, name: str):
         with mat_col:
             st.markdown("## Game mat")
             st.write(f"**Round:** {round_no} cards — **{direction}**")
-            st.write(f"**Trump:** {state['trump_card'][1]} of {state['trump_suit']}")
-            st.write(f"**Led by:** {players[state['leader_index']]}")
+            trump_suit, trump_rank = state["trump_card"]
+            st.write("**Trump card:**")
+            render_hand_cards(
+                [Card(Suit(trump_suit), int(trump_rank))],
+                compact=not show_card_faces,
+            )
+            leader_index = state["leader_index"]
+            st.write(f"**Led by:** {players[leader_index]}")
+            active_index = None
             if state["status"] == "bidding":
-                bid_index = state["bid_order"][state["bid_turn"]]
-                st.write(f"**Bid turn:** {players[bid_index]}")
+                active_index = state["bid_order"][state["bid_turn"]]
+                st.write(f"**Bid turn:** {players[active_index]}")
             elif state["status"] == "playing":
-                st.write(f"**Current turn:** {players[state['current_turn']]}")
+                active_index = state["current_turn"]
+                st.write(f"**Current turn:** {players[active_index]}")
             else:
                 st.write(f"**Phase:** {state['status'].replace('_', ' ').title()}")
+
+            current_plays = state["trick_plays"]
+            completed_plays = (
+                state["trick_history"][-1]["plays"]
+                if state["trick_history"] and not current_plays
+                else []
+            )
+            displayed_plays = current_plays or completed_plays
+            plays_by_player = {play["player_index"]: play for play in displayed_plays}
+            winning_index = None
+            if current_plays:
+                winning_index = trick_winner(
+                    [
+                        (play["player_index"], Card(Suit(play["suit"]), int(play["rank"])))
+                        for play in current_plays
+                    ],
+                    Suit(state["trump_suit"]),
+                )
+            elif completed_plays:
+                winning_index = next(
+                    play["player_index"]
+                    for play in completed_plays
+                    if play["player"] == state["trick_history"][-1]["winner"]
+                )
+
             st.markdown("### Bids called vs. tricks won")
-            st.table(
-                [
+            st.caption("Players are ordered from the current trick leader, then in play order.")
+            player_order = [
+                (leader_index + offset) % len(players) for offset in range(len(players))
+            ]
+            table_rows = []
+            for index in player_order:
+                player = players[index]
+                played = plays_by_player.get(index)
+                markers = []
+                if index == leader_index:
+                    markers.append("LEAD")
+                if index == active_index:
+                    markers.append("▶ TURN")
+                if index == winning_index:
+                    markers.append("★ WINNING")
+                table_rows.append(
                     {
                         "Player": player,
+                        "Marker": " · ".join(markers),
                         "Bid called": state["bids"].get(player, "—"),
                         "Tricks won": state["tricks"].get(player, 0),
+                        "Card played": (
+                            card_label(Card(Suit(played["suit"]), int(played["rank"])))
+                            if played else "—"
+                        ),
                         "Cumulative score": state["scores"].get(player, 0),
                     }
-                    for player in players
-                ]
-            )
-            st.markdown("### Current trick")
-            if state["trick_plays"]:
-                st.table(
-                    [
-                        {
-                            "Player": play["player"],
-                            "Card": card_label(Card(Suit(play["suit"]), int(play["rank"]))),
-                        }
-                        for play in state["trick_plays"]
-                    ]
                 )
-            else:
+            st.table(table_rows)
+
+            if current_plays:
+                st.caption("Previous trick remains available while this trick is in progress.")
+                if len(state["trick_history"]) > 0:
+                    previous = state["trick_history"][-1]
+                    previous_cards = " · ".join(
+                        f"{play['player']}: {card_label(Card(Suit(play['suit']), int(play['rank'])))}"
+                        for play in previous["plays"]
+                    )
+                    st.info(f"Previous trick — {previous_cards} — {previous['winner']} won")
+            elif not completed_plays:
                 st.caption("No cards played in this trick yet.")
+
             if state["trick_history"]:
-                with st.expander("Previous tricks"):
+                with st.expander("All previous tricks"):
                     for number, trick in enumerate(state["trick_history"], 1):
                         cards = ", ".join(
                             f"{play['player']}: {card_label(Card(Suit(play['suit']), int(play['rank'])))}"

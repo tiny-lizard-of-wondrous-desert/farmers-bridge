@@ -292,10 +292,12 @@ class OnlineRoomStore:
 
         return self._mutate(code, mutation)
 
-    def correct_bid(self, code: str, player_name: str, bid: int):
-        """Update one player's bid during the bid-review phase."""
+    def correct_bid(self, code: str, host_name: str, player_name: str, bid: int):
+        """Let the host correct one named bid during the explicit review phase."""
 
         def mutation(state):
+            if state["players"][0]["name"] != host_name:
+                raise ValueError("Only the host can correct bids.")
             if state["status"] != "bids_review":
                 raise ValueError("Bid corrections are only available during bid review.")
             if player_name not in state["bids"]:

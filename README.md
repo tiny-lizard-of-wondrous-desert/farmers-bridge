@@ -5,37 +5,38 @@ A Python implementation of Farmer's Bridge with a shared game engine and three i
 
 ## To-dos for "Ready"
 
-First considerations Fixes:
-- "trick complete" popup should also shows j/q/k/a instead of 11-14 -> use the compact version
-- Only host can update bids if needed -> or host gets "are all bids good" and if no, can select someone who is allowed to change their bid, and repeat until bids are fixed, etc. -> don't want silent bid changing mid game
-- Can "choose a card" be clicking on the displayed card (in both visual & compact mode)? Or does it need to be the dropdown? (If it needs to be the dropdown, make a default "please choose card" so players don't accidentally play the wrong card)
-- Move the "current trick" card display into the same table as the "bids vs tricks" table
-- Trump card should also be shown as a card (in compact mode or not)
-- "Round 3..." label should be below the resize slider, etc.
-- Round by round scores should show (bid: x, tricks:y, score:z)
-- Make a selection at the top for "show card faces vs compact mode" -> checkbox, etc. so that users can turn the card faces on/off as they please (for some/all of the viewing)
+### First considerations fixes
 
+Implemented in the online Streamlit interface:
 
-## Next
+- [x] "Trick complete" popup formats J/Q/K/A as letters and uses compact rank/suit notation.
+- [x] Only the host can correct bids during the explicit bid-review phase. The host selects the player, makes a correction, and can repeat the review before confirming all bids.
+- [x] Players click an enabled card in their hand to play it. Illegal cards are disabled; the dropdown has been removed.
+- [x] Current-trick cards are shown in the same player table as bids and tricks.
+- [x] Trump is displayed as a card face or compact rank/suit label.
+- [x] The round/direction heading appears below the panel resize control.
+- [x] Round-by-round scores show each player's bid, tricks won, points earned and cumulative score.
+- [x] A card-face preference checkbox controls the hand display; narrow panels automatically use compact notation.
 
-Recommended implementation order:
+### Next
 
-1. Add the current trick's cards directly to the player table, with a small "led" marker beside the player who led + a marker for "who is currently going to win this trick"
-2. Keep the previous trick visible until the current trick is completed
-3. On mobile, replace the side-by-side layout with a Hand / Game Mat tab or segmented switch, keeping the current-turn and score summary visible above it.
+Implemented where compatible with the current split-screen layout:
 
-- Add a "Card played" column and highlight the player currently winning the trick. Keep the played card in that player's row until the trick resolves.
-- Highlight the current player's row according to the active phase: next bidder during bidding, next player during card play.
-- Put the bid selector in the player's table row only if it remains usable on narrow screens. Otherwise keep the bid control above the hand/table.
+- [x] Add the current trick's cards directly to the player table, with a "LEAD" marker and current winning-trick marker.
+- [x] Keep the previous trick visible while the next trick is in progress; all completed tricks remain available in the history expander.
+- [x] On detected mobile browsers, replace the side-by-side layout with a Hand / Game Mat switch, keeping round, current-turn and score summaries above it.
+- [x] Add a "Card played" column and highlight the player currently winning the trick. The played card stays in that player's row until the trick resolves.
+- [x] Highlight the current player independently of the leader: next bidder during bidding, next player during card play.
+- [x] Keep bid correction controls above the hand/table rather than embedding them in the player rows, so they remain usable on narrow screens.
 
+### Possible considerations (reviewed)
 
-## Possible considerations (design options; not yet implemented)
+Both suggestions are now covered by the implementation above:
 
-- Reorder the player table from the player who leads to the last player in the current bidding/play order. The first row should carry a small "LEAD" label; the current player should be highlighted independently.
-- Keep the hand visually close to the game mat on desktop; on mobile, use a dedicated hand/game-mat switch rather than forcing two narrow columns.
+- The player table is ordered from the current leader, with a separate "LEAD" marker and independent current-player marker. This makes play order easier to follow. The trade-off is that row positions move when the leader changes; keeping a fixed seat order would be more spatially consistent but harder to follow during a trick.
+- Desktop keeps the hand close to the game mat in an adjustable split view; detected mobile browsers use a Hand / Game Mat switch. This avoids narrow side-by-side panels on phones. User-agent detection can misclassify tablets or unusual browsers, so the desktop full-panel controls remain available as a fallback.
 
-These are proposals only; choose a layout before implementing them.
-
+No additional behavior was added for this section because the existing fixes and "Next" items already implement both suggestions without introducing another competing layout mode.
 
 ## Project layout
 
